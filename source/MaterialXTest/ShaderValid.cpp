@@ -431,18 +431,18 @@ TEST_CASE("GLSL Shader", "[shadervalid]")
     {
         const std::string lightDoc = " \
         <?xml version=\"1.0\"?> \
-        <materialx version=\"1.35\" require=\"\"> \
+        <materialx version=\"1.36\"> \
           <nodegraph name=\"lighting1\"> \
-            <surface name=\"surface1\" type=\"surfaceshader\"> \
+            <sx:surface name=\"surface1\" type=\"surfaceshader\"> \
               <input name=\"bsdf\" type=\"BSDF\" value=\"\" nodename=\"diffusebsdf1\" /> \
               <input name=\"edf\" type=\"EDF\" value=\"\" /> \
               <input name=\"opacity\" type=\"float\" value=\"1.0\" /> \
-            </surface>  \
-            <diffusebsdf name=\"diffusebsdf1\" type=\"BSDF\"> \
+            </sx:surface>  \
+            <sx:diffusebsdf name=\"diffusebsdf1\" type=\"BSDF\"> \
               <input name=\"reflectance\" type=\"color3\" value=\"1.0, 1.0, 1.0\" />  \
               <input name=\"roughness\" type=\"float\" value=\"0.8\" /> \
               <input name=\"normal\" type=\"vector3\" /> \
-            </diffusebsdf>  \
+            </sx:diffusebsdf>  \
             <output name=\"out\" type=\"surfaceshader\" nodename=\"surface1\" /> \
           </nodegraph> \
         </materialx>";

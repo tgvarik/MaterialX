@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<materialx version="1.36">
+<materialx namespace="sx" version="1.36">
 
   <!-- <diffusebsdf> -->
   <implementation name="IM_diffusebsdf__sx_glsl" nodedef="ND_diffusebsdf" file="sxpbrlib/sx-glsl/sx_diffusebsdf.glsl" function="sx_diffusebsdf" language="sx-glsl"/>

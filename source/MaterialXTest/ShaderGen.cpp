@@ -140,12 +140,12 @@ void createExampleMaterials(mx::DocumentPtr doc, std::vector<mx::MaterialPtr>& m
         normalTex->setParameterValue("file", std::string(""), "filename");
         normalTex->setParameterValue("default", mx::Vector3(0.5f, 0.5f, 1.0f));
         normalTex->setConnectedNode("texcoord", uvscale);
-        mx::NodePtr normalMap1 = textureGraph->addNode("normalmap", "normalmap1", "vector3");
+        mx::NodePtr normalMap1 = textureGraph->addNode("sx:normalmap", "normalmap1", "vector3");
         normalMap1->setConnectedNode("in", normalTex);
         outNormal->setConnectedNode(normalMap1);
 
         mx::MaterialPtr material = doc->addMaterial("example1");
-        mx::ShaderRefPtr shaderRef = material->addShaderRef("surface", "standardsurface");
+        mx::ShaderRefPtr shaderRef = material->addShaderRef("surface", "sx:standard_surface");
 
         // Bind texture for normal map from the graph above
         mx::BindInputPtr normalInput = shaderRef->addBindInput("normal", "vector3");
@@ -175,10 +175,10 @@ void createExampleMaterials(mx::DocumentPtr doc, std::vector<mx::MaterialPtr>& m
         mx::NodeGraphPtr shaderGraph = doc->addNodeGraph("IMP_testshader2");
 
         // Get a normal facing our view direction
-        mx::NodePtr shadingnormal = shaderGraph->addNode("shadingnormal", "shadingnormal1", "vector3");
+        mx::NodePtr shadingnormal = shaderGraph->addNode("sx:shadingnormal", "shadingnormal1", "vector3");
 
         // A diffuse lobe
-        mx::NodePtr diffuse = shaderGraph->addNode("diffusebsdf", "diffuse", "BSDF");
+        mx::NodePtr diffuse = shaderGraph->addNode("sx:diffusebsdf", "diffuse", "BSDF");
         diffuse->setConnectedNode("normal", shadingnormal);
         mx::InputPtr diffuse_reflectance = diffuse->addInput("reflectance", "color3");
         diffuse_reflectance->setInterfaceName("diffuse_reflectance");
@@ -186,7 +186,7 @@ void createExampleMaterials(mx::DocumentPtr doc, std::vector<mx::MaterialPtr>& m
         diffuse_roughness->setInterfaceName("diffuse_roughness");
 
         // A specular lobe
-        mx::NodePtr specular = shaderGraph->addNode("coatingbsdf", "coating", "BSDF");
+        mx::NodePtr specular = shaderGraph->addNode("sx:coatingbsdf", "coating", "BSDF");
         specular->setConnectedNode("normal", shadingnormal);
         specular->setConnectedNode("base", diffuse);
         mx::InputPtr specular_reflectance = specular->addInput("reflectance", "color3");
@@ -199,7 +199,7 @@ void createExampleMaterials(mx::DocumentPtr doc, std::vector<mx::MaterialPtr>& m
         specular_IOR->setInterfaceName("specular_IOR");
 
         // Create a surface shader construction node and connect the final BSDF
-        mx::NodePtr surface = shaderGraph->addNode("surface", "surface1", "surfaceshader");
+        mx::NodePtr surface = shaderGraph->addNode("sx:surface", "surface1", "surfaceshader");
         surface->setConnectedNode("bsdf", specular);
 
         // Connect it as the graph output
@@ -243,10 +243,10 @@ void createExampleMaterials(mx::DocumentPtr doc, std::vector<mx::MaterialPtr>& m
         mx::NodeGraphPtr shaderGraph = doc->addNodeGraph("IMP_testshader3");
 
         // Get a normal facing our view direction
-        mx::NodePtr shadingnormal = shaderGraph->addNode("shadingnormal", "shadingnormal1", "vector3");
+        mx::NodePtr shadingnormal = shaderGraph->addNode("sx:shadingnormal", "shadingnormal1", "vector3");
 
         // A metal lobe with artistic fresnel
-        mx::NodePtr metal1 = shaderGraph->addNode("metalbsdf", "metal1", "BSDF");
+        mx::NodePtr metal1 = shaderGraph->addNode("sx:metalbsdf", "metal1", "BSDF");
         metal1->setConnectedNode("normal", shadingnormal);
         mx::InputPtr reflectivity = metal1->addInput("reflectivity", "color3");
         reflectivity->setInterfaceName("reflectivity");
@@ -258,13 +258,13 @@ void createExampleMaterials(mx::DocumentPtr doc, std::vector<mx::MaterialPtr>& m
         anisotropy1->setInterfaceName("anisotropy");
 
         // A metal lobe with complex fresnel
-        mx::NodePtr metal2 = shaderGraph->addNode("metalbsdf", "metal2", "BSDF");
-        mx::NodePtr reflectivity1 = shaderGraph->addNode("reflectivity", "reflectivity1", "color3");
+        mx::NodePtr metal2 = shaderGraph->addNode("sx:metalbsdf", "metal2", "BSDF");
+        mx::NodePtr reflectivity1 = shaderGraph->addNode("sx:reflectivity", "reflectivity1", "color3");
         mx::InputPtr reflectivity1_ior_n = reflectivity1->addInput("ior_n", "vector3");
         reflectivity1_ior_n->setInterfaceName("ior_n");
         mx::InputPtr reflectivity1_ior_k = reflectivity1->addInput("ior_k", "vector3");
         reflectivity1_ior_k->setInterfaceName("ior_k");
-        mx::NodePtr edgetint1 = shaderGraph->addNode("edgetint", "edgetint1", "color3");
+        mx::NodePtr edgetint1 = shaderGraph->addNode("sx:edgetint", "edgetint1", "color3");
         mx::InputPtr edgetint1_ior_n = edgetint1->addInput("ior_n", "vector3");
         edgetint1_ior_n->setInterfaceName("ior_n");
         edgetint1->setConnectedNode("reflectivity", reflectivity1);
@@ -276,14 +276,14 @@ void createExampleMaterials(mx::DocumentPtr doc, std::vector<mx::MaterialPtr>& m
         mx::InputPtr anisotropy2 = metal2->addInput("anisotropy", "float");
         anisotropy2->setInterfaceName("anisotropy");
 
-        mx::NodePtr mix = shaderGraph->addNode("mixbsdf", "mix", "BSDF");
+        mx::NodePtr mix = shaderGraph->addNode("sx:mixbsdf", "mix", "BSDF");
         mx::InputPtr weight = mix->addInput("weight", "float");
         weight->setInterfaceName("artistic_vs_complex");
         mix->setConnectedNode("in1", metal2);
         mix->setConnectedNode("in2", metal1);
         
         // Create a surface shader construction node and connect the final BSDF
-        mx::NodePtr surface = shaderGraph->addNode("surface", "surface1", "surfaceshader");
+        mx::NodePtr surface = shaderGraph->addNode("sx:surface", "surface1", "surfaceshader");
         surface->setConnectedNode("bsdf", mix);
 
         // Connect it as the graph output
@@ -343,7 +343,7 @@ void createExampleMaterials(mx::DocumentPtr doc, std::vector<mx::MaterialPtr>& m
         mx::NodeGraphPtr shaderGraph = doc->addNodeGraph("IMP_testshader4");
         shaderGraph->setAttribute("nodedef", nodeDef->getName());
 
-        mx::NodePtr standardSurface = shaderGraph->addNode("standardsurface", "standardsurface1", "surfaceshader");
+        mx::NodePtr standardSurface = shaderGraph->addNode("sx:standard_surface", "standard_surface1", "surfaceshader");
         for (auto shaderParam : shaderParams)
         {
             const std::string& name = shaderParam.first.first;
@@ -357,7 +357,7 @@ void createExampleMaterials(mx::DocumentPtr doc, std::vector<mx::MaterialPtr>& m
                 nodeDef->addInput(name + "_map", "filename");
 
                 // Create the inputmap node and connect it to the shader interface
-                mx::NodePtr texInput = shaderGraph->addNode("inputmap", name, type);
+                mx::NodePtr texInput = shaderGraph->addNode("sx:inputmap", name, type);
                 mx::InputPtr file = texInput->addInput("file", "filename");
                 file->setInterfaceName(name + "_map");
                 mx::InputPtr value = texInput->addInput("value", type);
@@ -383,14 +383,14 @@ void createExampleMaterials(mx::DocumentPtr doc, std::vector<mx::MaterialPtr>& m
         mx::ParameterPtr specularNormalTexFile = specularNormalTex->addParameter("file", "filename");
         specularNormalTexFile->setInterfaceName("normalmap");
         specularNormalTex->setParameterValue("default", mx::Vector3(0.5f, 0.5f, 1.0f));
-        mx::NodePtr specularNormalMap = shaderGraph->addNode("normalmap", "normalmap1", "vector3");
+        mx::NodePtr specularNormalMap = shaderGraph->addNode("sx:normalmap", "normalmap1", "vector3");
         specularNormalMap->setConnectedNode("in", specularNormalTex);
 
         mx::NodePtr coatNormalTex = shaderGraph->addNode("image", "coatTex", "vector3");
         mx::ParameterPtr coatNormalTexFile = coatNormalTex->addParameter("file", "filename");
         coatNormalTexFile->setInterfaceName("coat_normalmap");
         coatNormalTex->setParameterValue("default", mx::Vector3(0.5f, 0.5f, 1.0f));
-        mx::NodePtr coatNormalMap = shaderGraph->addNode("normalmap", "normalmap2", "vector3");
+        mx::NodePtr coatNormalMap = shaderGraph->addNode("sx:normalmap", "normalmap2", "vector3");
         coatNormalMap->setConnectedNode("in", coatNormalTex);
 
         standardSurface->setConnectedNode("normal", specularNormalMap);
@@ -1472,17 +1472,17 @@ TEST_CASE("BSDF Layering", "[shadergen]")
     nodeGraph->setAttribute("nodedef", nodeDef->getName());
 
     // Diffuse component
-    mx::NodePtr diffuse = nodeGraph->addNode("diffusebsdf", "diffuse", "BSDF");
+    mx::NodePtr diffuse = nodeGraph->addNode("sx:diffusebsdf", "diffuse", "BSDF");
     mx::InputPtr diffuse_color = diffuse->addInput("reflectance", "color3");
     diffuse_color->setInterfaceName("diffuse_color");
 
     // Translucent (thin walled SSS) component
-    mx::NodePtr sss = nodeGraph->addNode("translucentbsdf", "sss", "BSDF");
+    mx::NodePtr sss = nodeGraph->addNode("sx:translucentbsdf", "sss", "BSDF");
     mx::InputPtr sss_color = sss->addInput("transmittance", "color3");
     sss_color->setInterfaceName("sss_color");
 
     // Mix diffuse over sss
-    mx::NodePtr substrate = nodeGraph->addNode("mixbsdf", "substrate", "BSDF");
+    mx::NodePtr substrate = nodeGraph->addNode("sx:mixbsdf", "substrate", "BSDF");
     mx::NodePtr substrate_weight_inv = nodeGraph->addNode("invert", "substrate_weight_inv", "float");
     substrate->setConnectedNode("in1", diffuse);
     substrate->setConnectedNode("in2", sss);
@@ -1491,7 +1491,7 @@ TEST_CASE("BSDF Layering", "[shadergen]")
     sss_weight->setInterfaceName("sss_weight");
 
     // Add a coating specular component on top
-    mx::NodePtr coating = nodeGraph->addNode("coatingbsdf", "coating", "BSDF");
+    mx::NodePtr coating = nodeGraph->addNode("sx:coatingbsdf", "coating", "BSDF");
     coating->setConnectedNode("base", substrate);
     mx::InputPtr coating_color = coating->addInput("reflectance", "color3");
     coating_color->setInterfaceName("coating_color");
@@ -1502,7 +1502,7 @@ TEST_CASE("BSDF Layering", "[shadergen]")
     coating_ior->setInterfaceName("coating_ior");
 
     // Create a surface shader
-    mx::NodePtr surface = nodeGraph->addNode("surface", "surface1", "surfaceshader");
+    mx::NodePtr surface = nodeGraph->addNode("sx:surface", "surface1", "surfaceshader");
     surface->setConnectedNode("bsdf", coating);
 
     // Connect to graph output
@@ -1614,11 +1614,11 @@ TEST_CASE("Transparency", "[shadergen]")
     mx::NodeGraphPtr nodeGraph = doc->addNodeGraph("IMP_" + exampleName);
     nodeGraph->setAttribute("nodedef", nodeDef->getName());
 
-    mx::NodePtr refraction = nodeGraph->addNode("refractionbsdf", "refraction", "BSDF");
+    mx::NodePtr refraction = nodeGraph->addNode("sx:refractionbsdf", "refraction", "BSDF");
     mx::InputPtr transmittance = refraction->addInput("transmittance", "color3");
     transmittance->setInterfaceName("transmittance");
 
-    mx::NodePtr coating = nodeGraph->addNode("coatingbsdf", "coating", "BSDF");
+    mx::NodePtr coating = nodeGraph->addNode("sx:coatingbsdf", "coating", "BSDF");
     coating->setConnectedNode("base", refraction);
     mx::InputPtr coating_color = coating->addInput("reflectance", "color3");
     coating_color->setInterfaceName("coating_color");
@@ -1635,7 +1635,7 @@ TEST_CASE("Transparency", "[shadergen]")
     coating->setConnectedNode("roughness", roughness_common);
     refraction->setConnectedNode("roughness", roughness_common);
 
-    mx::NodePtr surface = nodeGraph->addNode("surface", "surface1", "surfaceshader");
+    mx::NodePtr surface = nodeGraph->addNode("sx:surface", "surface1", "surfaceshader");
     surface->setConnectedNode("bsdf", coating);
     mx::InputPtr opacity = surface->addInput("opacity", "float");
     opacity->setInterfaceName("opacity");
@@ -1747,25 +1747,25 @@ TEST_CASE("Surface Layering", "[shadergen]")
     nodeGraph->setAttribute("nodedef", nodeDef->getName());
 
     // Create first surface layer from a surface with two BSDF's
-    mx::NodePtr layer1_diffuse = nodeGraph->addNode("diffusebsdf", "layer1_diffuse", "BSDF");
+    mx::NodePtr layer1_diffuse = nodeGraph->addNode("sx:diffusebsdf", "layer1_diffuse", "BSDF");
     mx::InputPtr layer1_diffuse_color = layer1_diffuse->addInput("reflectance", "color3");
     layer1_diffuse_color->setInterfaceName("layer1_diffuse");
-    mx::NodePtr layer1_specular = nodeGraph->addNode("coatingbsdf", "layer1_specular", "BSDF");
+    mx::NodePtr layer1_specular = nodeGraph->addNode("sx:coatingbsdf", "layer1_specular", "BSDF");
     layer1_specular->setConnectedNode("base", layer1_diffuse);
     mx::InputPtr layer1_specular_color = layer1_specular->addInput("reflectance", "color3");
     layer1_specular_color->setInterfaceName("layer1_specular");
-    mx::NodePtr layer1 = nodeGraph->addNode("surface", "layer1", "surfaceshader");
+    mx::NodePtr layer1 = nodeGraph->addNode("sx:surface", "layer1", "surfaceshader");
     layer1->setConnectedNode("bsdf", layer1_specular);
 
     // Create second surface layer from a standard uber shader
-    mx::NodePtr layer2 = nodeGraph->addNode("standardsurface", "layer2", "surfaceshader");
+    mx::NodePtr layer2 = nodeGraph->addNode("sx:standard_surface", "layer2", "surfaceshader");
     mx::InputPtr layer2_diffuse_color = layer2->addInput("base_color", "color3");
     layer2_diffuse_color->setInterfaceName("layer2_diffuse");
     mx::InputPtr layer2_specular_color = layer2->addInput("specular_color", "color3");
     layer2_specular_color->setInterfaceName("layer2_specular");
 
     // Create layer mixer
-    mx::NodePtr mixer = nodeGraph->addNode("layeredsurface", "mixer", "surfaceshader");
+    mx::NodePtr mixer = nodeGraph->addNode("sx:layeredsurface", "mixer", "surfaceshader");
     mixer->setConnectedNode("top", layer2);
     mixer->setConnectedNode("base", layer1);
     mx::InputPtr mix_weight = mixer->addInput("weight", "float");

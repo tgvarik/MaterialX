@@ -40,7 +40,7 @@ namespace
 }
 
 const string GlslShaderGenerator::LANGUAGE = "sx-glsl";
-const string GlslShaderGenerator::TARGET = "glsl_v4.0";
+const string GlslShaderGenerator::TARGET = "glsl400";
 const string GlslShaderGenerator::VERSION = "400";
 const string GlslShaderGenerator::LIGHT_DIR = "L";
 const string GlslShaderGenerator::VIEW_DIR = "V";
