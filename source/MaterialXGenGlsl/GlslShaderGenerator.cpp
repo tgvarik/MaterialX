@@ -1,25 +1,27 @@
 #include <MaterialXGenGlsl/GlslShaderGenerator.h>
 #include <MaterialXGenGlsl/GlslSyntax.h>
-#include <MaterialXGenGlsl/Nodes/PositionGlsl.h>
-#include <MaterialXGenGlsl/Nodes/NormalGlsl.h>
-#include <MaterialXGenGlsl/Nodes/TangentGlsl.h>
-#include <MaterialXGenGlsl/Nodes/BitangentGlsl.h>
-#include <MaterialXGenGlsl/Nodes/TexCoordGlsl.h>
-#include <MaterialXGenGlsl/Nodes/GeomColorGlsl.h>
-#include <MaterialXGenGlsl/Nodes/GeomAttrValueGlsl.h>
-#include <MaterialXGenGlsl/Nodes/FrameGlsl.h>
-#include <MaterialXGenGlsl/Nodes/TimeGlsl.h>
-#include <MaterialXGenGlsl/Nodes/ViewDirectionGlsl.h>
-#include <MaterialXGenGlsl/Nodes/SurfaceGlsl.h>
-#include <MaterialXGenGlsl/Nodes/SurfaceShaderGlsl.h>
-#include <MaterialXGenGlsl/Nodes/LightGlsl.h>
-#include <MaterialXGenGlsl/Nodes/LightCompoundGlsl.h>
-#include <MaterialXGenGlsl/Nodes/LightShaderGlsl.h>
+#include <MaterialXGenGlsl/Nodes/PositionNodeGlsl.h>
+#include <MaterialXGenGlsl/Nodes/NormalNodeGlsl.h>
+#include <MaterialXGenGlsl/Nodes/TangentNodeGlsl.h>
+#include <MaterialXGenGlsl/Nodes/BitangentNodeGlsl.h>
+#include <MaterialXGenGlsl/Nodes/TexCoordNodeGlsl.h>
+#include <MaterialXGenGlsl/Nodes/GeomColorNodeGlsl.h>
+#include <MaterialXGenGlsl/Nodes/GeomAttrValueNodeGlsl.h>
+#include <MaterialXGenGlsl/Nodes/FrameNodeGlsl.h>
+#include <MaterialXGenGlsl/Nodes/TimeNodeGlsl.h>
+#include <MaterialXGenGlsl/Nodes/ViewDirectionNodeGlsl.h>
+#include <MaterialXGenGlsl/Nodes/SurfaceNodeGlsl.h>
+#include <MaterialXGenGlsl/Nodes/SurfaceShaderNodeGlsl.h>
+#include <MaterialXGenGlsl/Nodes/LightNodeGlsl.h>
+#include <MaterialXGenGlsl/Nodes/LightCompoundNodeGlsl.h>
+#include <MaterialXGenGlsl/Nodes/LightShaderNodeGlsl.h>
+#include <MaterialXGenGlsl/Nodes/HeightToNormalNodeGlsl.h>
 
-#include <MaterialXGenShader/Nodes/SourceCode.h>
-#include <MaterialXGenShader/Nodes/Swizzle.h>
-#include <MaterialXGenShader/Nodes/Switch.h>
-#include <MaterialXGenShader/Nodes/Compare.h>
+#include <MaterialXGenShader/Nodes/SourceCodeNode.h>
+#include <MaterialXGenShader/Nodes/SwizzleNode.h>
+#include <MaterialXGenShader/Nodes/SwitchNode.h>
+#include <MaterialXGenShader/Nodes/CompareNode.h>
+#include <MaterialXGenShader/Nodes/BlurNode.h>
 
 namespace MaterialX
 {
@@ -57,18 +59,24 @@ GlslShaderGenerator::GlslShaderGenerator()
     // Create the node contexts used by this generator
     //
 
-    // BSDF context
-    SgNodeContextPtr ctxBsdf = createNodeContext(NODE_CONTEXT_BSDF);
-    ctxBsdf->addArgument(Argument("vec3", INCIDENT));
-    ctxBsdf->addArgument(Argument("vec3", OUTGOING));
+    // BSDF reflection context
+    GenContextPtr ctxBsdfReflection = createContext(CONTEXT_BSDF_REFLECTION);
+    ctxBsdfReflection->addArgument(Argument("vec3", INCIDENT));
+    ctxBsdfReflection->addArgument(Argument("vec3", OUTGOING));
+    ctxBsdfReflection->setFunctionSuffix("_reflection");
 
-    // BSDF-IBL context
-    SgNodeContextPtr ctxBsdfIbl = createNodeContext(NODE_CONTEXT_BSDF_IBL);
-    ctxBsdfIbl->addArgument(Argument("vec3", OUTGOING));
-    ctxBsdfIbl->setFunctionSuffix("_ibl");
+    // BSDF transmission context
+    GenContextPtr ctxBsdfTransmission = createContext(CONTEXT_BSDF_TRANSMISSION);
+    ctxBsdfTransmission->addArgument(Argument("vec3", OUTGOING));
+    ctxBsdfTransmission->setFunctionSuffix("_transmission");
 
-    // EDF context
-    SgNodeContextPtr ctxEdf = createNodeContext(NODE_CONTEXT_EDF);
+    // BSDF indirect context
+    GenContextPtr ctxBsdfIndirect = createContext(CONTEXT_BSDF_INDIRECT);
+    ctxBsdfIndirect->addArgument(Argument("vec3", OUTGOING));
+    ctxBsdfIndirect->setFunctionSuffix("_indirect");
+
+    // EDF emission context
+    GenContextPtr ctxEdf = createContext(CONTEXT_EDF);
     ctxEdf->addArgument(Argument("vec3", NORMAL));
     ctxEdf->addArgument(Argument("vec3", EVAL));
 
@@ -77,146 +85,158 @@ GlslShaderGenerator::GlslShaderGenerator()
     //
 
     // <!-- <compare> -->
-    registerImplementation("IM_compare_float_sx_glsl", Compare::create);
-    registerImplementation("IM_compare_color2_sx_glsl", Compare::create);
-    registerImplementation("IM_compare_color3_sx_glsl", Compare::create);
-    registerImplementation("IM_compare_color4_sx_glsl", Compare::create);
-    registerImplementation("IM_compare_vector2_sx_glsl", Compare::create);
-    registerImplementation("IM_compare_vector3_sx_glsl", Compare::create);
-    registerImplementation("IM_compare_vector4_sx_glsl", Compare::create);
+    registerImplementation("IM_compare_float_sx_glsl", CompareNode::create);
+    registerImplementation("IM_compare_color2_sx_glsl", CompareNode::create);
+    registerImplementation("IM_compare_color3_sx_glsl", CompareNode::create);
+    registerImplementation("IM_compare_color4_sx_glsl", CompareNode::create);
+    registerImplementation("IM_compare_vector2_sx_glsl", CompareNode::create);
+    registerImplementation("IM_compare_vector3_sx_glsl", CompareNode::create);
+    registerImplementation("IM_compare_vector4_sx_glsl", CompareNode::create);
 
     // <!-- <switch> -->
     // <!-- 'which' type : float -->
-    registerImplementation("IM_switch_float_sx_glsl", Switch::create);
-    registerImplementation("IM_switch_color2_sx_glsl", Switch::create);
-    registerImplementation("IM_switch_color3_sx_glsl", Switch::create);
-    registerImplementation("IM_switch_color4_sx_glsl", Switch::create);
-    registerImplementation("IM_switch_vector2_sx_glsl", Switch::create);
-    registerImplementation("IM_switch_vector3_sx_glsl", Switch::create);
-    registerImplementation("IM_switch_vector4_sx_glsl", Switch::create);
+    registerImplementation("IM_switch_float_sx_glsl", SwitchNode::create);
+    registerImplementation("IM_switch_color2_sx_glsl", SwitchNode::create);
+    registerImplementation("IM_switch_color3_sx_glsl", SwitchNode::create);
+    registerImplementation("IM_switch_color4_sx_glsl", SwitchNode::create);
+    registerImplementation("IM_switch_vector2_sx_glsl", SwitchNode::create);
+    registerImplementation("IM_switch_vector3_sx_glsl", SwitchNode::create);
+    registerImplementation("IM_switch_vector4_sx_glsl", SwitchNode::create);
     // <!-- 'which' type : integer -->
-    registerImplementation("IM_switch_floatI_sx_glsl", Switch::create);
-    registerImplementation("IM_switch_color2I_sx_glsl", Switch::create);
-    registerImplementation("IM_switch_color3I_sx_glsl", Switch::create);
-    registerImplementation("IM_switch_color4I_sx_glsl", Switch::create);
-    registerImplementation("IM_switch_vector2I_sx_glsl", Switch::create);
-    registerImplementation("IM_switch_vector3I_sx_glsl", Switch::create);
-    registerImplementation("IM_switch_vector4I_sx_glsl", Switch::create);
+    registerImplementation("IM_switch_floatI_sx_glsl", SwitchNode::create);
+    registerImplementation("IM_switch_color2I_sx_glsl", SwitchNode::create);
+    registerImplementation("IM_switch_color3I_sx_glsl", SwitchNode::create);
+    registerImplementation("IM_switch_color4I_sx_glsl", SwitchNode::create);
+    registerImplementation("IM_switch_vector2I_sx_glsl", SwitchNode::create);
+    registerImplementation("IM_switch_vector3I_sx_glsl", SwitchNode::create);
+    registerImplementation("IM_switch_vector4I_sx_glsl", SwitchNode::create);
     // <!-- 'which' type : boolean -->
-    registerImplementation("IM_switch_floatB_sx_glsl", Switch::create);
-    registerImplementation("IM_switch_color2B_sx_glsl", Switch::create);
-    registerImplementation("IM_switch_color3B_sx_glsl", Switch::create);
-    registerImplementation("IM_switch_color4B_sx_glsl", Switch::create);
-    registerImplementation("IM_switch_vector2B_sx_glsl", Switch::create);
-    registerImplementation("IM_switch_vector3B_sx_glsl", Switch::create);
-    registerImplementation("IM_switch_vector4B_sx_glsl", Switch::create);
+    registerImplementation("IM_switch_floatB_sx_glsl", SwitchNode::create);
+    registerImplementation("IM_switch_color2B_sx_glsl", SwitchNode::create);
+    registerImplementation("IM_switch_color3B_sx_glsl", SwitchNode::create);
+    registerImplementation("IM_switch_color4B_sx_glsl", SwitchNode::create);
+    registerImplementation("IM_switch_vector2B_sx_glsl", SwitchNode::create);
+    registerImplementation("IM_switch_vector3B_sx_glsl", SwitchNode::create);
+    registerImplementation("IM_switch_vector4B_sx_glsl", SwitchNode::create);
 
     // <!-- <swizzle> -->
     // <!-- from type : float -->
-    registerImplementation("IM_swizzle_float_color2_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_float_color3_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_float_color4_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_float_vector2_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_float_vector3_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_float_vector4_sx_glsl", Swizzle::create);
+    registerImplementation("IM_swizzle_float_color2_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_float_color3_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_float_color4_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_float_vector2_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_float_vector3_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_float_vector4_sx_glsl", SwizzleNode::create);
     // <!-- from type : color2 -->
-    registerImplementation("IM_swizzle_color2_float_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_color2_color2_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_color2_color3_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_color2_color4_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_color2_vector2_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_color2_vector3_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_color2_vector4_sx_glsl", Swizzle::create);
+    registerImplementation("IM_swizzle_color2_float_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_color2_color2_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_color2_color3_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_color2_color4_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_color2_vector2_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_color2_vector3_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_color2_vector4_sx_glsl", SwizzleNode::create);
     // <!-- from type : color3 -->
-    registerImplementation("IM_swizzle_color3_float_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_color3_color2_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_color3_color3_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_color3_color4_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_color3_vector2_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_color3_vector3_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_color3_vector4_sx_glsl", Swizzle::create);
+    registerImplementation("IM_swizzle_color3_float_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_color3_color2_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_color3_color3_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_color3_color4_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_color3_vector2_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_color3_vector3_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_color3_vector4_sx_glsl", SwizzleNode::create);
     // <!-- from type : color4 -->
-    registerImplementation("IM_swizzle_color4_float_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_color4_color2_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_color4_color3_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_color4_color4_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_color4_vector2_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_color4_vector3_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_color4_vector4_sx_glsl", Swizzle::create);
+    registerImplementation("IM_swizzle_color4_float_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_color4_color2_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_color4_color3_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_color4_color4_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_color4_vector2_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_color4_vector3_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_color4_vector4_sx_glsl", SwizzleNode::create);
     // <!-- from type : vector2 -->
-    registerImplementation("IM_swizzle_vector2_float_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_vector2_color2_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_vector2_color3_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_vector2_color4_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_vector2_vector2_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_vector2_vector3_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_vector2_vector4_sx_glsl", Swizzle::create);
+    registerImplementation("IM_swizzle_vector2_float_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_vector2_color2_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_vector2_color3_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_vector2_color4_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_vector2_vector2_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_vector2_vector3_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_vector2_vector4_sx_glsl", SwizzleNode::create);
     // <!-- from type : vector3 -->
-    registerImplementation("IM_swizzle_vector3_float_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_vector3_color2_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_vector3_color3_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_vector3_color4_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_vector3_vector2_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_vector3_vector3_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_vector3_vector4_sx_glsl", Swizzle::create);
+    registerImplementation("IM_swizzle_vector3_float_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_vector3_color2_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_vector3_color3_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_vector3_color4_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_vector3_vector2_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_vector3_vector3_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_vector3_vector4_sx_glsl", SwizzleNode::create);
     // <!-- from type : vector4 -->
-    registerImplementation("IM_swizzle_vector4_float_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_vector4_color2_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_vector4_color3_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_vector4_color4_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_vector4_vector2_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_vector4_vector3_sx_glsl", Swizzle::create);
-    registerImplementation("IM_swizzle_vector4_vector4_sx_glsl", Swizzle::create);
+    registerImplementation("IM_swizzle_vector4_float_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_vector4_color2_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_vector4_color3_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_vector4_color4_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_vector4_vector2_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_vector4_vector3_sx_glsl", SwizzleNode::create);
+    registerImplementation("IM_swizzle_vector4_vector4_sx_glsl", SwizzleNode::create);
 
     // <!-- <position> -->
-    registerImplementation("IM_position_vector3_sx_glsl", PositionGlsl::create);
+    registerImplementation("IM_position_vector3_sx_glsl", PositionNodeGlsl::create);
     // <!-- <normal> -->
-    registerImplementation("IM_normal_vector3_sx_glsl", NormalGlsl::create);
+    registerImplementation("IM_normal_vector3_sx_glsl", NormalNodeGlsl::create);
     // <!-- <tangent> -->
-    registerImplementation("IM_tangent_vector3_sx_glsl", TangentGlsl::create);
+    registerImplementation("IM_tangent_vector3_sx_glsl", TangentNodeGlsl::create);
     // <!-- <bitangent> -->
-    registerImplementation("IM_bitangent_vector3_sx_glsl", BitangentGlsl::create);
+    registerImplementation("IM_bitangent_vector3_sx_glsl", BitangentNodeGlsl::create);
     // <!-- <texcoord> -->
-    registerImplementation("IM_texcoord_vector2_sx_glsl", TexCoordGlsl::create);
-    registerImplementation("IM_texcoord_vector3_sx_glsl", TexCoordGlsl::create);
+    registerImplementation("IM_texcoord_vector2_sx_glsl", TexCoordNodeGlsl::create);
+    registerImplementation("IM_texcoord_vector3_sx_glsl", TexCoordNodeGlsl::create);
     // <!-- <geomcolor> -->
-    registerImplementation("IM_geomcolor_float_sx_glsl", GeomColorGlsl::create);
-    registerImplementation("IM_geomcolor_color2_sx_glsl", GeomColorGlsl::create);
-    registerImplementation("IM_geomcolor_color3_sx_glsl", GeomColorGlsl::create);
-    registerImplementation("IM_geomcolor_color4_sx_glsl", GeomColorGlsl::create);
+    registerImplementation("IM_geomcolor_float_sx_glsl", GeomColorNodeGlsl::create);
+    registerImplementation("IM_geomcolor_color2_sx_glsl", GeomColorNodeGlsl::create);
+    registerImplementation("IM_geomcolor_color3_sx_glsl", GeomColorNodeGlsl::create);
+    registerImplementation("IM_geomcolor_color4_sx_glsl", GeomColorNodeGlsl::create);
     // <!-- <geomattrvalue> -->
-    registerImplementation("IM_geomattrvalue_integer_sx_glsl", GeomAttrValueGlsl::create);
-    registerImplementation("IM_geomattrvalue_boolean_sx_glsl", GeomAttrValueGlsl::create);
-    registerImplementation("IM_geomattrvalue_string_sx_glsl", GeomAttrValueGlsl::create);
-    registerImplementation("IM_geomattrvalue_float_sx_glsl", GeomAttrValueGlsl::create);
-    registerImplementation("IM_geomattrvalue_color2_sx_glsl", GeomAttrValueGlsl::create);
-    registerImplementation("IM_geomattrvalue_color3_sx_glsl", GeomAttrValueGlsl::create);
-    registerImplementation("IM_geomattrvalue_color4_sx_glsl", GeomAttrValueGlsl::create);
-    registerImplementation("IM_geomattrvalue_vector2_sx_glsl", GeomAttrValueGlsl::create);
-    registerImplementation("IM_geomattrvalue_vector3_sx_glsl", GeomAttrValueGlsl::create);
-    registerImplementation("IM_geomattrvalue_vector4_sx_glsl", GeomAttrValueGlsl::create);
+    registerImplementation("IM_geomattrvalue_integer_sx_glsl", GeomAttrValueNodeGlsl::create);
+    registerImplementation("IM_geomattrvalue_boolean_sx_glsl", GeomAttrValueNodeGlsl::create);
+    registerImplementation("IM_geomattrvalue_string_sx_glsl", GeomAttrValueNodeGlsl::create);
+    registerImplementation("IM_geomattrvalue_float_sx_glsl", GeomAttrValueNodeGlsl::create);
+    registerImplementation("IM_geomattrvalue_color2_sx_glsl", GeomAttrValueNodeGlsl::create);
+    registerImplementation("IM_geomattrvalue_color3_sx_glsl", GeomAttrValueNodeGlsl::create);
+    registerImplementation("IM_geomattrvalue_color4_sx_glsl", GeomAttrValueNodeGlsl::create);
+    registerImplementation("IM_geomattrvalue_vector2_sx_glsl", GeomAttrValueNodeGlsl::create);
+    registerImplementation("IM_geomattrvalue_vector3_sx_glsl", GeomAttrValueNodeGlsl::create);
+    registerImplementation("IM_geomattrvalue_vector4_sx_glsl", GeomAttrValueNodeGlsl::create);
 
     // <!-- <frame> -->
-    registerImplementation("IM_frame_float_sx_glsl", FrameGlsl::create);
+    registerImplementation("IM_frame_float_sx_glsl", FrameNodeGlsl::create);
     // <!-- <time> -->
-    registerImplementation("IM_time_float_sx_glsl", TimeGlsl::create);
+    registerImplementation("IM_time_float_sx_glsl", TimeNodeGlsl::create);
     // <!-- <viewdirection> -->
-    registerImplementation("IM_viewdirection_vector3_sx_glsl", ViewDirectionGlsl::create);
+    registerImplementation("IM_viewdirection_vector3_sx_glsl", ViewDirectionNodeGlsl::create);
 
     // <!-- <surface> -->
-    registerImplementation("IM_surface_sx_glsl", SurfaceGlsl::create);
+    registerImplementation("IM_surface_sx_glsl", SurfaceNodeGlsl::create);
     // <!-- <light> -->
-    registerImplementation("IM_light_sx_glsl", LightGlsl::create);
+    registerImplementation("IM_light_sx_glsl", LightNodeGlsl::create);
 
     // <!-- <pointlight> -->
-    registerImplementation("IM_pointlight_sx_glsl", LightShaderGlsl::create);
+    registerImplementation("IM_pointlight_sx_glsl", LightShaderNodeGlsl::create);
     // <!-- <directionallight> -->
-    registerImplementation("IM_directionallight_sx_glsl", LightShaderGlsl::create);
+    registerImplementation("IM_directionallight_sx_glsl", LightShaderNodeGlsl::create);
     // <!-- <spotlight> -->
-    registerImplementation("IM_spotlight_sx_glsl", LightShaderGlsl::create);
+    registerImplementation("IM_spotlight_sx_glsl", LightShaderNodeGlsl::create);
+
+    // <!-- <heighttonormal> -->
+    registerImplementation("IM_heighttonormal_vector3_sx_glsl", HeightToNormalNodeGlsl::create);
+
+    // <!-- <blur> -->
+    registerImplementation("IM_blur_float_sx_glsl", BlurNode::create);
+    registerImplementation("IM_blur_color2_sx_glsl", BlurNode::create);
+    registerImplementation("IM_blur_color3_sx_glsl", BlurNode::create);
+    registerImplementation("IM_blur_color4_sx_glsl", BlurNode::create);
+    registerImplementation("IM_blur_vector2_sx_glsl", BlurNode::create);
+    registerImplementation("IM_blur_vector3_sx_glsl", BlurNode::create);
+    registerImplementation("IM_blur_vector4_sx_glsl", BlurNode::create);
 }
 
-ShaderPtr GlslShaderGenerator::generate(const string& shaderName, ElementPtr element, const SgOptions& options)
+ShaderPtr GlslShaderGenerator::generate(const string& shaderName, ElementPtr element, const GenOptions& options)
 {
     HwShaderPtr shaderPtr = std::make_shared<HwShader>(shaderName);
     shaderPtr->initialize(element, *this, options);
@@ -238,33 +258,33 @@ ShaderPtr GlslShaderGenerator::generate(const string& shaderName, ElementPtr ele
     shader.addLine("#version " + getVersion(), false);
     shader.newLine();
 
+    // Add all constants
+    const Shader::VariableBlock& vsConstants = shader.getConstantBlock(HwShader::VERTEX_STAGE);
+    if (!vsConstants.empty())
+    {
+        shader.addComment("Constant block: " + vsConstants.name);
+        emitVariableBlock(vsConstants, _syntax->getConstantQualifier(), shader);
+    }
+
     // Add all private uniforms
     const Shader::VariableBlock& vsPrivateUniforms = shader.getUniformBlock(HwShader::VERTEX_STAGE, HwShader::PRIVATE_UNIFORMS);
-    if (vsPrivateUniforms.variableOrder.size())
+    if (!vsPrivateUniforms.empty())
     {
         shader.addComment("Uniform block: " + vsPrivateUniforms.name);
-        for (const Shader::Variable* uniform : vsPrivateUniforms.variableOrder)
-        {
-            emitUniform(*uniform, shader);
-        }
-        shader.newLine();
+        emitVariableBlock(vsPrivateUniforms, _syntax->getUniformQualifier(), shader);
     }
 
     // Add any public uniforms
     const Shader::VariableBlock& vsPublicUniforms = shader.getUniformBlock(HwShader::VERTEX_STAGE, HwShader::PUBLIC_UNIFORMS);
-    if (vsPublicUniforms.variableOrder.size())
+    if (!vsPublicUniforms.empty())
     {
         shader.addComment("Uniform block: " + vsPublicUniforms.name);
-        for (const Shader::Variable* uniform : vsPublicUniforms.variableOrder)
-        {
-            emitUniform(*uniform, shader);
-        }
-        shader.newLine();
+        emitVariableBlock(vsPublicUniforms, _syntax->getUniformQualifier(), shader);
     }
 
     // Add all app data inputs
     const Shader::VariableBlock& appDataBlock = shader.getAppDataBlock();
-    if (appDataBlock.variableOrder.size())
+    if (!appDataBlock.empty())
     {
         shader.addComment("Application data block: " + appDataBlock.name);
         for (const Shader::Variable* input : appDataBlock.variableOrder)
@@ -277,7 +297,7 @@ ShaderPtr GlslShaderGenerator::generate(const string& shaderName, ElementPtr ele
 
     // Add vertex data block
     const Shader::VariableBlock& vertexDataBlock = shader.getVertexDataBlock();
-    if (vertexDataBlock.variableOrder.size())
+    if (!vertexDataBlock.empty())
     {
         shader.addLine("out VertexData", false);
         shader.beginScope(Shader::Brackets::BRACES);
@@ -298,7 +318,7 @@ ShaderPtr GlslShaderGenerator::generate(const string& shaderName, ElementPtr ele
     shader.beginScope(Shader::Brackets::BRACES);
     shader.addLine("vec4 hPositionWorld = u_worldMatrix * vec4(i_position, 1.0)");
     shader.addLine("gl_Position = u_viewProjectionMatrix * hPositionWorld");
-    emitFunctionCalls(*_defaultNodeContext, shader);
+    emitFunctionCalls(*_defaultContext, shader);
     shader.endScope();
     shader.newLine();
 
@@ -318,31 +338,32 @@ ShaderPtr GlslShaderGenerator::generate(const string& shaderName, ElementPtr ele
     shader.newLine();
     emitTypeDefs(shader);
 
+    // Add constants
+    const Shader::VariableBlock& psConstants = shader.getConstantBlock(HwShader::PIXEL_STAGE);
+    if (!psConstants.empty())
+    {
+        shader.addComment("Constant block: " + psConstants.name);
+        emitVariableBlock(psConstants, _syntax->getConstantQualifier(), shader);
+    }
+
     // Add all private uniforms
     const Shader::VariableBlock& psPrivateUniforms = shader.getUniformBlock(HwShader::PIXEL_STAGE, HwShader::PRIVATE_UNIFORMS);
-    if (psPrivateUniforms.variableOrder.size())
+    if (!psPrivateUniforms.empty())
     {
         shader.addComment("Uniform block: " + psPrivateUniforms.name);
-        for (const Shader::Variable* uniform : psPrivateUniforms.variableOrder)
-        {
-            emitUniform(*uniform, shader);
-        }
-        shader.newLine();
+        emitVariableBlock(psPrivateUniforms, _syntax->getUniformQualifier(), shader);
     }
 
     // Add all public uniforms
     const Shader::VariableBlock& psPublicUniforms = shader.getUniformBlock(HwShader::PIXEL_STAGE, HwShader::PUBLIC_UNIFORMS);
-    if (psPublicUniforms.variableOrder.size())
+    if (!psPublicUniforms.empty())
     {
         shader.addComment("Uniform block: " + psPublicUniforms.name);
-        for (const Shader::Variable* uniform : psPublicUniforms.variableOrder)
-        {
-            emitUniform(*uniform, shader);
-        }
-        shader.newLine();
+        emitVariableBlock(psPublicUniforms, _syntax->getUniformQualifier(), shader);
     }
 
-    bool lighting = shader.hasClassification(SgNode::Classification::SHADER | SgNode::Classification::SURFACE);
+    bool lighting = shader.hasClassification(ShaderNode::Classification::SHADER | ShaderNode::Classification::SURFACE) ||
+                    shader.hasClassification(ShaderNode::Classification::BSDF);
 
     // Add light data block if needed
     if (lighting)
@@ -362,7 +383,7 @@ ShaderPtr GlslShaderGenerator::generate(const string& shaderName, ElementPtr ele
     }
 
     // Add vertex data block
-    if (vertexDataBlock.variableOrder.size())
+    if (!vertexDataBlock.empty())
     {
         shader.addLine("in VertexData", false);
         shader.beginScope(Shader::Brackets::BRACES);
@@ -379,7 +400,7 @@ ShaderPtr GlslShaderGenerator::generate(const string& shaderName, ElementPtr ele
     // Add the pixel shader output. This needs to be a vec4 for rendering
     // and upstream connection will be converted to vec4 if needed in emitFinalOutput()
     shader.addComment("Data output by the pixel shader");
-    const SgOutputSocket* outputSocket = shader.getNodeGraph()->getOutputSocket();
+    const ShaderGraphOutputSocket* outputSocket = shader.getGraph()->getOutputSocket();
     shader.addLine("out vec4 " + outputSocket->name);
     shader.newLine();
 
@@ -387,10 +408,18 @@ ShaderPtr GlslShaderGenerator::generate(const string& shaderName, ElementPtr ele
     shader.addInclude("sxpbrlib/sx-glsl/lib/sx_math.glsl", *this);
     shader.newLine();
 
+    // Emit lighting functions
     if (lighting)
     {
-        // Emit lighting functions
         shader.addInclude("sxpbrlib/sx-glsl/lib/sx_lighting.glsl", *this);
+        shader.newLine();
+    }
+
+    // Emit sampling code if needed
+    if (shader.hasClassification(ShaderNode::Classification::CONVOLUTION2D))
+    {
+        // Emit sampling functions
+        shader.addInclude("stdlib/sx-glsl/lib/sx_sampling.glsl", *this);
         shader.newLine();
     }
 
@@ -400,7 +429,7 @@ ShaderPtr GlslShaderGenerator::generate(const string& shaderName, ElementPtr ele
     // Add main function
     shader.addLine("void main()", false);
     shader.beginScope(Shader::Brackets::BRACES);
-    emitFunctionCalls(*_defaultNodeContext, shader);
+    emitFunctionCalls(*_defaultContext, shader);
     emitFinalOutput(shader);
     shader.endScope();
     shader.newLine();
@@ -417,12 +446,12 @@ void GlslShaderGenerator::emitFunctionDefinitions(Shader& shader)
         shader.addBlock(shader.getRequestedVDirection() != getTargetVDirection() ? VDIRECTION_FLIP : VDIRECTION_NOOP, *this);
 
         // For surface shaders we need light shaders
-        if (shader.hasClassification(SgNode::Classification::SHADER | SgNode::Classification::SURFACE))
+        if (shader.hasClassification(ShaderNode::Classification::SHADER | ShaderNode::Classification::SURFACE))
         {
             // Emit functions for all bound light shaders
             for (auto lightShader : getBoundLightShaders())
             {
-                lightShader.second->emitFunctionDefinition(*SgNode::NONE, *this, shader);
+                lightShader.second->emitFunctionDefinition(*ShaderNode::NONE, *this, shader);
             }
 
             // Emit active light count function
@@ -441,7 +470,7 @@ void GlslShaderGenerator::emitFunctionDefinitions(Shader& shader)
             {
                 shader.addLine(ifstatement + "(light.type == " + std::to_string(lightShader.first) + ")", false);
                 shader.beginScope(Shader::Brackets::BRACES);
-                lightShader.second->emitFunctionCall(*SgNode::NONE, *_defaultNodeContext, *this, shader);
+                lightShader.second->emitFunctionCall(*ShaderNode::NONE, *_defaultContext, *this, shader);
                 shader.endScope();
                 ifstatement = "else if ";
             }
@@ -455,12 +484,12 @@ void GlslShaderGenerator::emitFunctionDefinitions(Shader& shader)
     ParentClass::emitFunctionDefinitions(shader);
 }
 
-void GlslShaderGenerator::emitFunctionCalls(const SgNodeContext& context, Shader &shader)
+void GlslShaderGenerator::emitFunctionCalls(const GenContext& context, Shader &shader)
 {
     BEGIN_SHADER_STAGE(shader, HwShader::VERTEX_STAGE)
         // For vertex stage just emit all function calls in order
         // and ignore conditional scope.
-        for (SgNode* node : shader.getNodeGraph()->getNodes())
+        for (ShaderNode* node : shader.getGraph()->getNodes())
         {
             shader.addFunctionCall(node, context, *this);
         }
@@ -468,16 +497,16 @@ void GlslShaderGenerator::emitFunctionCalls(const SgNodeContext& context, Shader
 
     BEGIN_SHADER_STAGE(shader, HwShader::PIXEL_STAGE)
         // For pixel stage surface shaders need special handling
-        if (shader.hasClassification(SgNode::Classification::SHADER | SgNode::Classification::SURFACE))
+        if (shader.hasClassification(ShaderNode::Classification::SHADER | ShaderNode::Classification::SURFACE))
         {
             // Handle all texturing nodes. These are inputs to any
             // closure/shader nodes and need to be emitted first.
             emitTextureNodes(shader);
 
             // Emit function calls for all surface shader nodes
-            for (SgNode* node : shader.getNodeGraph()->getNodes())
+            for (ShaderNode* node : shader.getGraph()->getNodes())
             {
-                if (node->hasClassification(SgNode::Classification::SHADER | SgNode::Classification::SURFACE))
+                if (node->hasClassification(ShaderNode::Classification::SHADER | ShaderNode::Classification::SURFACE))
                 {
                     shader.addFunctionCall(node, context, *this);
                 }
@@ -493,7 +522,7 @@ void GlslShaderGenerator::emitFunctionCalls(const SgNodeContext& context, Shader
 
 void GlslShaderGenerator::emitFinalOutput(Shader& shader) const
 {
-    const SgOutputSocket* outputSocket = shader.getNodeGraph()->getOutputSocket();
+    const ShaderGraphOutputSocket* outputSocket = shader.getGraph()->getOutputSocket();
 
     // Early out for the rare case where the whole graph is just a single value
     if (!outputSocket->connection)
@@ -515,11 +544,18 @@ void GlslShaderGenerator::emitFinalOutput(Shader& shader) const
 
     string finalOutput = outputSocket->connection->name;
 
-    if (shader.hasClassification(SgNode::Classification::SURFACE))
+    if (shader.hasClassification(ShaderNode::Classification::SURFACE))
     {
-        shader.addComment("TODO: How should we output transparency?");
-        shader.addLine("float outAlpha = 1.0 - sx_max_component(" + finalOutput + ".transparency)");
-        shader.addLine(outputSocket->name + " = vec4(" + finalOutput + ".color, outAlpha)");
+        const HwShader& hwShader = static_cast<const HwShader&>(shader);
+        if (hwShader.hasTransparency())
+        {
+            shader.addLine("float outAlpha = clamp(1.0 - dot(" + finalOutput + ".transparency, vec3(0.3333)), 0.0, 1.0)");
+            shader.addLine(outputSocket->name + " = vec4(" + finalOutput + ".color, outAlpha)");
+        }
+        else
+        {
+            shader.addLine(outputSocket->name + " = vec4(" + finalOutput + ".color, 1.0)");
+        }
     }
     else
     {
@@ -531,16 +567,32 @@ void GlslShaderGenerator::emitFinalOutput(Shader& shader) const
     }
 }
 
-void GlslShaderGenerator::addNodeContextIDs(SgNode* node) const
+void GlslShaderGenerator::addNodeContextIDs(ShaderNode* node) const
 {
-    if (node->hasClassification(SgNode::Classification::BSDF))
+    if (node->hasClassification(ShaderNode::Classification::BSDF))
     {
-        node->addContextID(NODE_CONTEXT_BSDF);
-        node->addContextID(NODE_CONTEXT_BSDF_IBL);
+        if (node->hasClassification(ShaderNode::Classification::BSDF_R))
+        {
+            // A BSDF for reflection only
+            node->addContextID(CONTEXT_BSDF_REFLECTION);
+            node->addContextID(CONTEXT_BSDF_INDIRECT);
+        }
+        else if (node->hasClassification(ShaderNode::Classification::BSDF_T))
+        {
+            // A BSDF for transmission only
+            node->addContextID(CONTEXT_BSDF_TRANSMISSION);
+        }
+        else
+        {
+            // A general BSDF handling both reflection and transmission
+            node->addContextID(CONTEXT_BSDF_REFLECTION);
+            node->addContextID(CONTEXT_BSDF_TRANSMISSION);
+            node->addContextID(CONTEXT_BSDF_INDIRECT);
+        }
     }
-    else if (node->hasClassification(SgNode::Classification::BSDF))
+    else if (node->hasClassification(ShaderNode::Classification::EDF))
     {
-        node->addContextID(NODE_CONTEXT_EDF);
+        node->addContextID(CONTEXT_EDF);
     }
     else
     {
@@ -552,11 +604,11 @@ void GlslShaderGenerator::emitTextureNodes(Shader& shader)
 {
     // Emit function calls for all texturing nodes
     bool found = false;
-    for (SgNode* node : shader.getNodeGraph()->getNodes())
+    for (ShaderNode* node : shader.getGraph()->getNodes())
     {
-        if (node->hasClassification(SgNode::Classification::TEXTURE) && !node->referencedConditionally())
+        if (node->hasClassification(ShaderNode::Classification::TEXTURE) && !node->referencedConditionally())
         {
-            shader.addFunctionCall(node, *_defaultNodeContext, *this);
+            shader.addFunctionCall(node, *_defaultContext, *this);
             found = true;
         }
     }
@@ -567,23 +619,50 @@ void GlslShaderGenerator::emitTextureNodes(Shader& shader)
     }
 }
 
-void GlslShaderGenerator::emitBsdfNodes(const SgNode& shaderNode, const string& incident, const string& outgoing, Shader& shader, string& bsdf)
+void GlslShaderGenerator::emitBsdfNodes(const ShaderNode& shaderNode, int bsdfContext, const string& incident, const string& outgoing, Shader& shader, string& bsdf)
 {
-    SgNodeContext context(NODE_CONTEXT_BSDF);
+    GenContext context(bsdfContext);
 
-    // Set extra arguments according to the given directions
-    context.addArgument(Argument("vec3", incident));
-    context.addArgument(Argument("vec3", outgoing));
-
-    SgNode* last = nullptr;
-
-    // Emit function calls for all BSDF nodes used by this shader
-    // The last node will hold the final result
-    for (SgNode* node : shader.getNodeGraph()->getNodes())
+    switch (bsdfContext)
     {
-        if (node->hasClassification(SgNode::Classification::BSDF) && shaderNode.isUsedClosure(node))
+    case CONTEXT_BSDF_REFLECTION:
+        context.addArgument(Argument("vec3", incident));
+        context.addArgument(Argument("vec3", outgoing));
+        context.setFunctionSuffix("_reflection");
+        break;
+    case CONTEXT_BSDF_TRANSMISSION:
+        context.addArgument(Argument("vec3", outgoing));
+        context.setFunctionSuffix("_transmission");
+        break;
+    case CONTEXT_BSDF_INDIRECT:
+        context.addArgument(Argument("vec3", outgoing));
+        context.setFunctionSuffix("_indirect");
+        break;
+    default:
+        throw ExceptionShaderGenError("Unknown bsdf context id given when generating bsdf node function calls");
+    }
+
+    ShaderNode* last = nullptr;
+
+    // Emit function calls for all BSDF nodes used by this shader.
+    // The last node will hold the final result.
+    for (ShaderNode* node : shader.getGraph()->getNodes())
+    {
+        if (node->hasClassification(ShaderNode::Classification::BSDF) && shaderNode.isUsedClosure(node))
         {
-            shader.addFunctionCall(node, context, *this);
+            // Check if the node is defined in this context.
+            if (node->getContextIDs().count(bsdfContext))
+            {
+                shader.addFunctionCall(node, context, *this);
+            }
+            else
+            {
+                // Node is not defined in this context so just 
+                // emit the output variable set to default value.
+                shader.beginLine();
+                emitOutput(context, node->getOutput(), true, true, shader);
+                shader.endLine();
+            }
             last = node;
         }
     }
@@ -594,50 +673,23 @@ void GlslShaderGenerator::emitBsdfNodes(const SgNode& shaderNode, const string& 
     }
 }
 
-void GlslShaderGenerator::emitBsdfNodesIBL(const SgNode& shaderNode, const string& outgoing, Shader& shader, string& radiance)
+void GlslShaderGenerator::emitEdfNodes(const ShaderNode& shaderNode, const string& normalDir, const string& evalDir, Shader& shader, string& edf)
 {
-    SgNodeContext context(NODE_CONTEXT_BSDF_IBL);
+    GenContext context(CONTEXT_EDF);
 
     // Set extra arguments according to the given directions
-    context.addArgument(Argument("vec3", outgoing));
-    context.setFunctionSuffix("_ibl");
-
-    SgNode* last = nullptr;
-
-    // Emit function calls for all BSDF nodes used by this shader
-    // The last node will hold the final result
-    for (SgNode* node : shader.getNodeGraph()->getNodes())
-    {
-        if (node->hasClassification(SgNode::Classification::BSDF) && shaderNode.isUsedClosure(node))
-        {
-            shader.addFunctionCall(node, context, *this);
-            last = node;
-        }
-    }
-
-    if (last)
-    {
-        radiance = last->getOutput()->name;
-    }
-}
-
-void GlslShaderGenerator::emitEdfNodes(const SgNode& shaderNode, const string& orientDir, const string& evalDir, Shader& shader, string& edf)
-{
-    SgNodeContext context(NODE_CONTEXT_EDF);
-
-    // Set extra arguments according to the given directions
-    context.addArgument(Argument("vec3", orientDir));
+    context.addArgument(Argument("vec3", normalDir));
     context.addArgument(Argument("vec3", evalDir));
 
-    edf = "vec3(0.0)";
+    edf = "EDF(0.0)";
 
-    SgNode* last = nullptr;
+    ShaderNode* last = nullptr;
 
     // Emit function calls for all EDF nodes used by this shader
     // The last node will hold the final result
-    for (SgNode* node : shader.getNodeGraph()->getNodes())
+    for (ShaderNode* node : shader.getGraph()->getNodes())
     {
-        if (node->hasClassification(SgNode::Classification::EDF) && shaderNode.isUsedClosure(node))
+        if (node->hasClassification(ShaderNode::Classification::EDF) && shaderNode.isUsedClosure(node))
         {
             shader.addFunctionCall(node, context, *this);
             last = node;
@@ -671,28 +723,39 @@ void GlslShaderGenerator::toVec4(const TypeDesc* type, string& variable)
     }
 }
 
-void GlslShaderGenerator::emitUniform(const Shader::Variable& uniform, Shader& shader)
+void GlslShaderGenerator::emitVariable(const Shader::Variable& variable, const string& qualifier, Shader& shader)
 {
     // A file texture input needs special handling on GLSL
-    if (uniform.type == Type::FILENAME)
+    if (variable.type == Type::FILENAME)
     {
-        shader.addLine("uniform sampler2D " + uniform.name);
+        // Samplers must always be uniforms
+        shader.addLine("uniform sampler2D " + variable.name);
     }
     else
     {
-        const string& type = _syntax->getTypeName(uniform.type);
-        string line = "uniform " + type + " " + uniform.name;
-        if (uniform.semantic.length())
-            line += " : " + uniform.semantic;
-        if (uniform.value)
-            line += " = " + _syntax->getValue(uniform.type, *uniform.value, true);
+        const string& type = _syntax->getTypeName(variable.type);
+
+        string line = qualifier + " " + type + " " + variable.name;
+        if (variable.semantic.length())
+            line += " : " + variable.semantic;
+        if (variable.value)
+        {
+            // If an arrays we need an array qualifier (suffix) for the variable name
+            string arraySuffix;
+            variable.getArraySuffix(arraySuffix);
+            line += arraySuffix;
+
+            line += " = " + _syntax->getValue(variable.type, *variable.value, true);
+        }
         else
-            line += " = " + _syntax->getDefaultValue(uniform.type, true);
+        {
+            line += " = " + _syntax->getDefaultValue(variable.type, true);
+        }
         shader.addLine(line);
     }
 }
 
-SgImplementationPtr GlslShaderGenerator::createCompoundImplementation(NodeGraphPtr impl)
+ShaderNodeImplPtr GlslShaderGenerator::createCompoundImplementation(NodeGraphPtr impl)
 {
     NodeDefPtr nodeDef = impl->getNodeDef();
     if (!nodeDef)
@@ -701,7 +764,7 @@ SgImplementationPtr GlslShaderGenerator::createCompoundImplementation(NodeGraphP
     }
     if (TypeDesc::get(nodeDef->getType()) == Type::LIGHTSHADER)
     {
-        return LightCompoundGlsl::create();
+        return LightCompoundNodeGlsl::create();
     }
     return ParentClass::createCompoundImplementation(impl);
 }

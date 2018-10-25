@@ -3,8 +3,8 @@
 
 #include <MaterialXCore/Library.h>
 #include <MaterialXCore/Node.h>
-#include <MaterialXGenShader/SgNode.h>
-#include <MaterialXGenShader/SgOptions.h>
+#include <MaterialXGenShader/ShaderGraph.h>
+#include <MaterialXGenShader/GenOptions.h>
 
 #include <queue>
 #include <sstream>
@@ -61,6 +61,21 @@ public:
             , semantic(s)
             , value(v)
         {}
+
+        void getArraySuffix(string& result) const
+        {
+            result.clear();
+            if (value && value->isA<vector<float>>())
+            {
+                vector<float> valueArray = value->asA<vector<float>>();
+                result = "[" + std::to_string(valueArray.size()) + "]";
+            }
+            else if (value && value->isA<vector<int>>())
+            {
+                vector<int> valueArray = value->asA<vector<int>>();
+                result = "[" + std::to_string(valueArray.size()) + "]";
+            }
+        }
     };
 
     using VariablePtr = std::shared_ptr<Variable>;
@@ -72,7 +87,9 @@ public:
         string instance;
         std::unordered_map<string, VariablePtr> variableMap;
         vector<Variable*> variableOrder;
-        VariableBlock(const string& n, const string& i) : name(n), instance(i) {}
+
+        VariableBlock(const string& n, const string& i) : name(n), instance(i) {}    
+        bool empty() const { return variableOrder.empty(); }
     };
 
     using VariableBlockPtr = std::shared_ptr<VariableBlock>;
@@ -103,7 +120,8 @@ public:
     /// Initialize the shader before shader generation.
     /// @param element The root element to generate the shader from. 
     /// @param shadergen The shader generator instance.
-    virtual void initialize(ElementPtr element, ShaderGenerator& shadergen, const SgOptions& options);
+    /// @param options Generation options
+    virtual void initialize(ElementPtr element, ShaderGenerator& shadergen, const GenOptions& options);
 
     /// Return the number of shader stages for this shader.
     /// Defaults to a single stage, derived classes can override this.
@@ -115,6 +133,10 @@ public:
     /// Return the active stage
     virtual size_t getActiveStage() const { return _activeStage; }
 
+    /// Create a new constant variable for a stage.
+    virtual void createConstant(size_t stage, const TypeDesc* type, const string& name,
+        const string& semantic = EMPTY_STRING, ValuePtr value = nullptr);
+
     /// Create a new variable block for uniform inputs in a stage.
     virtual void createUniformBlock(size_t stage, const string& block, const string& instance = EMPTY_STRING);
 
@@ -125,6 +147,9 @@ public:
 
     /// Create a new variable for application/geometric data (primvars).
     virtual void createAppData(const TypeDesc* type, const string& name, const string& semantic = EMPTY_STRING);
+
+    /// Return the block of constant variables for a stage.
+    const VariableBlock& getConstantBlock(size_t stage) const;
 
     /// Return all blocks of uniform variables for a stage.
     const VariableBlockMap& getUniformBlocks(size_t stage) const { return _stages[stage].uniforms; }
@@ -161,10 +186,10 @@ public:
     virtual void addBlock(const string& str, ShaderGenerator& shadergen);
 
     /// Add the function definition for a node
-    virtual void addFunctionDefinition(SgNode* node, ShaderGenerator& shadergen);
+    virtual void addFunctionDefinition(ShaderNode* node, ShaderGenerator& shadergen);
 
     /// Add the function call for a node
-    virtual void addFunctionCall(SgNode* node, const SgNodeContext& context, ShaderGenerator& shadergen);
+    virtual void addFunctionCall(ShaderNode* node, const GenContext& context, ShaderGenerator& shadergen);
 
     /// Add the contents of an include file
     /// Making sure it is only included once
@@ -187,42 +212,23 @@ public:
     const string& getName() const { return _name; }
 
     /// Return the active shader graph.
-    SgNodeGraph* getNodeGraph() const { return _graphStack.back(); }
+    ShaderGraph* getGraph() const { return _graphStack.back(); }
 
     /// Push a new active shader graph.
     /// Used when emitting code for compounds / subgraphs.
-    void pushActiveGraph(SgNodeGraph* graph) { _graphStack.push_back(graph); }
+    void pushActiveGraph(ShaderGraph* graph) { _graphStack.push_back(graph); }
 
     /// Reactivate the previously last used shader graph.
     void popActiveGraph() { _graphStack.pop_back(); }
 
     /// Return true if this shader matches the given classification.
-    bool hasClassification(unsigned int c) const { return getNodeGraph()->hasClassification(c); }
+    bool hasClassification(unsigned int c) const { return getGraph()->hasClassification(c); }
 
     /// Return the vdirection requested in the current document.
     VDirection getRequestedVDirection() const { return _vdirection; }
 
     /// Return the final shader source code for a given shader stage
     const string& getSourceCode(size_t stage = PIXEL_STAGE) const { return _stages[stage].code; }
-
-    bool isTransparent() const
-    {
-        if (getNodeGraph()->hasClassification(SgNode::Classification::SHADER))
-        {
-            for (SgNode* node : getNodeGraph()->getNodes())
-            {
-                if (node && node->hasClassification(SgNode::Classification::SHADER))
-                {
-                    MaterialX::SgImplementation* implementation = node->getImplementation();
-                    if (implementation)
-                    {
-                        return implementation->isTransparent(*node);
-                    }
-                }
-            }
-        }
-        return false;
-    }
 
 protected:
 
@@ -234,15 +240,18 @@ protected:
         int indentations;
         std::queue<Brackets> scopes;
         std::set<string> includes;
-        std::set<SgImplementation*> definedFunctions;
-        
+        std::set<ShaderNodeImpl*> definedFunctions;
+
+        // Block holding constant variables for this stage
+        VariableBlock constants;
+
         // Blocks holding uniform variables for this stage
         VariableBlockMap uniforms;
 
         // Resulting source code for this stage
         string code;
 
-        Stage(const string& n) : name(n), indentations(0) {}
+        Stage(const string& n) : name(n), indentations(0), constants("Constants", "cn") {}
     };
 
     /// Return the currently active stage
@@ -252,11 +261,11 @@ protected:
     virtual void indent();
 
     /// Return a container with all top level graphs use by this shader.
-    virtual void getTopLevelShaderGraphs(ShaderGenerator& shadergen, std::deque<SgNodeGraph*>& graphs) const;
+    virtual void getTopLevelShaderGraphs(ShaderGenerator& shadergen, std::deque<ShaderGraph*>& graphs) const;
 
     string _name;
-    SgNodeGraphPtr _rootGraph;
-    vector<SgNodeGraph*> _graphStack;
+    ShaderGraphPtr _rootGraph;
+    vector<ShaderGraph*> _graphStack;
     VDirection _vdirection;
 
     size_t _activeStage;
