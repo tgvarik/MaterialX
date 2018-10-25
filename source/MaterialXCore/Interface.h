@@ -13,6 +13,8 @@
 
 #include <MaterialXCore/Element.h>
 
+#include <MaterialXCore/Geom.h>
+
 namespace MaterialX
 {
 
@@ -199,6 +201,13 @@ class Input : public PortElement
     {
         return 1;
     }
+
+    /// @}
+    /// @name GeomProp
+    /// @{
+
+    /// Return the GeomProp element, if defined, for this input.
+    GeomPropPtr getGeomProp() const;
 
     /// @}
 
@@ -577,9 +586,12 @@ class InterfaceElement : public TypedElement
     /// one, then false is returned.
     ///
     /// If the two interface elements have child Parameter or Input elements
-    /// with identical names but different types, then false is returned.  Note
-    /// that a Parameter or Input that is present in only one of the two
-    /// interfaces does not affect their type compatibility.
+    /// with identical names but different types, then false is returned.
+    ///
+    /// Note that a Parameter or Input that is present in only one of the two
+    /// interfaces does not affect their type compatibility by default. This behaviour
+    /// can be overridden in derived classes by overriding the requiresInputCompatibility() 
+    /// method.
     bool isTypeCompatible(ConstInterfaceElementPtr rhs) const;
 
     /// @}
@@ -588,6 +600,11 @@ class InterfaceElement : public TypedElement
     static const string NODE_DEF_ATTRIBUTE;
 
   protected:
+    /// When performing a type compatibility check this method will be invoked.
+    /// The return value indicates if the existence of an Input or a Parameter is required
+    /// based on the element being compared. The default return value is false.
+    virtual bool requiresInputCompatibility(ConstInterfaceElementPtr rhs) const;
+
     void registerChildElement(ElementPtr child) override;
     void unregisterChildElement(ElementPtr child) override;
 

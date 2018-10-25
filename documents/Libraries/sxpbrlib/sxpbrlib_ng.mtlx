@@ -1,44 +1,38 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <materialx version="1.36">
-  <!-- <shadingnormal> -->
-  <nodegraph name="IMP_shadingnormal_vector3" nodedef="ND_shadingnormal_vector3" type="vector3">
-    <normal name="Nw" type="vector3">
-      <parameter name="space" type="string" value="world"/>
-    </normal>
-    <multiply name="Nw_flipped" type="vector3">
-      <input name="in1" type="vector3" nodename="Nw"/>
-      <input name="in2" type="float" value="-1.0"/>
-    </multiply>
-    <backfacing name="backfacing" type="float"/>
-    <mix name="flip" type="vector3">
-      <input name="fg" type="vector3" nodename="Nw_flipped"/>
-      <input name="bg" type="vector3" nodename="Nw"/>
-      <input name="mix" type="float" nodename="backfacing"/>
-    </mix>
-    <output name="out" type="vector3" nodename="flip"/>
-  </nodegraph>
-
   <!-- <inputmap> -->
   <nodegraph name="IMP_inputmap_float" nodedef="ND_inputmap_float">
     <image name="image" type="float">
-      <input name="file" type="filename" interfacename="file" />
-      <input name="default" type="float" interfacename="value" />
+      <parameter name="file" type="filename" interfacename="file" />
+      <parameter name="default" type="float" interfacename="value" />
     </image>
     <output name="out" type="float" nodename="image" />
   </nodegraph>
   <nodegraph name="IMP_inputmap_color3" nodedef="ND_inputmap_color3">
     <image name="image" type="color3">
-      <input name="file" type="filename" interfacename="file" />
-      <input name="default" type="color3" interfacename="value" />
+      <parameter name="file" type="filename" interfacename="file" />
+      <parameter name="default" type="color3" interfacename="value" />
     </image>
     <output name="out" type="color3" nodename="image" />
   </nodegraph>
   <nodegraph name="IMP_inputmap_vector3" nodedef="ND_inputmap_vector3">
     <image name="image" type="vector3">
-      <input name="file" type="filename" interfacename="file" />
-      <input name="default" type="vector3" interfacename="value" />
+      <parameter name="file" type="filename" interfacename="file" />
+      <parameter name="default" type="vector3" interfacename="value" />
     </image>
     <output name="out" type="vector3" nodename="image" />
+  </nodegraph>
+
+  <!-- <glossiness> -->
+  <nodegraph name="IMP_glossiness" nodedef="ND_glossiness">
+    <invert name="invert1" type="float">
+      <input name="in" type="float" interfacename="glossiness" />
+    </invert>
+    <roughness name="roughness1" type="roughnessinfo">
+      <input name="roughness" type="float" nodename="invert1" />
+      <input name="anisotropy" type="float" interfacename="anisotropy" />
+    </roughness>
+    <output name="out" type="roughnessinfo" nodename="roughness1" />
   </nodegraph>
 
   <!-- <standard_surface> -->
@@ -71,7 +65,7 @@
       <input name="in" type="float" nodename="multiply7" />
       <parameter name="amount" type="float" value="1.0" />
     </invert>
-    <roughness name="rougness2" type="vector2">
+    <roughness name="rougness2" type="roughnessinfo">
       <input name="roughness" type="float" nodename="invert3" />
       <input name="anisotropy" type="float" interfacename="specular_anisotropy" />
     </roughness>
@@ -96,9 +90,9 @@
     <!-- Transmission layer -->
     <dielectricbtdf name="Transmission_BSDF" type="BSDF">
       <input name="weight" type="float" value="1.0" />
-      <input name="color" type="color3" interfacename="transmission_color" />
+      <input name="tint" type="color3" interfacename="transmission_color" />
       <input name="ior" type="float" interfacename="specular_IOR" />
-      <input name="roughness" type="vector2" nodename="rougness2" />
+      <input name="roughness" type="roughnessinfo" nodename="rougness2" />
       <input name="normal" type="vector3" interfacename="normal" />
       <input name="tangent" type="vector3" interfacename="tangent" />
       <input name="distribution" type="string" value="ggx" />
@@ -114,7 +108,7 @@
       <input name="weight" type="float" interfacename="specular" />
       <input name="tint" type="color3" interfacename="specular_color" />
       <input name="ior" type="float" interfacename="specular_IOR" />
-      <input name="roughness" type="vector2" nodename="rougness2" />
+      <input name="roughness" type="roughnessinfo" nodename="rougness2" />
       <input name="normal" type="vector3" interfacename="normal" />
       <input name="tangent" type="vector3" interfacename="tangent" />
       <input name="distribution" type="string" value="ggx" />
@@ -125,7 +119,7 @@
       <input name="weight" type="float" interfacename="base" />
       <input name="reflectivity" type="color3" interfacename="base_color"/>
       <input name="edgecolor" type="color3" interfacename="specular_color"/>
-      <input name="roughness" type="vector2" nodename="rougness2" />
+      <input name="roughness" type="roughnessinfo" nodename="rougness2" />
       <input name="normal" type="vector3" interfacename="normal" />
       <input name="tangent" type="vector3" interfacename="tangent" />
       <input name="distribution" type="string" value="ggx" />
@@ -139,21 +133,21 @@
     <mix name="coat_attenuation" type="color3" >
       <input name="fg" type="color3" interfacename="coat_color" />
       <input name="bg" type="color3" value="1.0, 1.0, 1.0" />
-      <input name="mix" type="float" nodename="coat" />
+      <input name="mix" type="float" interfacename="coat" />
     </mix>
     <scalebsdf name="scalebsdf1" type="BSDF">
       <input name="in" type="BSDF" nodename="mixbsdf2" />
       <input name="weight" type="color3" nodename="coat_attenuation" />
     </scalebsdf>
-    <roughness name="coat_roughness2" type="vector2">
+    <roughness name="coat_roughness2" type="roughnessinfo">
       <input name="roughness" type="float" interfacename="coat_roughness" />
-      <input name="anisotropy" type="float" value="0" />
+      <input name="anisotropy" type="float" value="0.0" />
     </roughness>
     <dielectricbrdf name="Coat_BSDF" type="BSDF">
       <input name="weight" type="float" interfacename="coat" />
       <input name="tint" type="color3" value="1.0, 1.0, 1.0" />
       <input name="ior" type="float" interfacename="coat_IOR" />
-      <input name="roughness" type="vector2" nodename="coat_roughness2" />
+      <input name="roughness" type="roughnessinfo" nodename="coat_roughness2" />
       <input name="normal" type="vector3" interfacename="coat_normal" />
       <input name="distribution" type="string" value="ggx" />
       <input name="base" type="BSDF" nodename="scalebsdf1" />

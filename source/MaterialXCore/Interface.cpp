@@ -154,6 +154,21 @@ Edge Input::getUpstreamEdge(ConstMaterialPtr material, size_t index) const
     return NULL_EDGE;
 }
 
+GeomPropPtr Input::getGeomProp() const
+{
+    // An input can only have a single geomprop,
+    // so return the first one found.
+    for (ElementPtr child : _childOrder)
+    {
+        GeomPropPtr geomprop = child->asA<GeomProp>();
+        if (geomprop)
+        {
+            return geomprop;
+        }
+    }
+    return nullptr;
+}
+
 //
 // Output methods
 //
@@ -421,16 +436,23 @@ NodeDefPtr InterfaceElement::getDeclaration(const string& target) const
     return NodeDefPtr();
 }
 
+bool InterfaceElement::requiresInputCompatibility(ConstInterfaceElementPtr rhs) const
+{
+    return false;
+}
+
 bool InterfaceElement::isTypeCompatible(ConstInterfaceElementPtr rhs) const
 {
     if (getType() != rhs->getType())
     {
         return false;
     }
+    bool requiresInputs = requiresInputCompatibility(rhs);
+
     for (ParameterPtr param : getActiveParameters())
     {
         ParameterPtr matchingParam = rhs->getActiveParameter(param->getName());
-        if (matchingParam && matchingParam->getType() != param->getType())
+        if ((!matchingParam && requiresInputs) || (matchingParam && matchingParam->getType() != param->getType()))
         {
             return false;
         }
@@ -438,7 +460,7 @@ bool InterfaceElement::isTypeCompatible(ConstInterfaceElementPtr rhs) const
     for (InputPtr input : getActiveInputs())
     {
         InputPtr matchingInput = rhs->getActiveInput(input->getName());
-        if (matchingInput && matchingInput->getType() != input->getType())
+        if ((!matchingInput && requiresInputs) || (matchingInput && matchingInput->getType() != input->getType()))
         {
             return false;
         }

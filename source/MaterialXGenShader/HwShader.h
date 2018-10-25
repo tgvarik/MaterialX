@@ -27,7 +27,8 @@ public:
     /// Initialize the shader before shader generation.
     /// @param element The root element to generate the shader from. 
     /// @param shadergen The shader generator instance.
-    void initialize(ElementPtr element, ShaderGenerator& shadergen, const SgOptions& options) override;
+    /// @param options Generation options
+    void initialize(ElementPtr element, ShaderGenerator& shadergen, const GenOptions& options) override;
 
     /// Return the number of shader stages for this shader.
     size_t numStages() const override { return NUM_STAGES; }
@@ -51,13 +52,21 @@ public:
         _calculatedVertexData.insert(outputName);
     }
 
+    /// Returns true if the shader has transparency fragments.
+    /// Will return false if the shader is opaque.
+    bool hasTransparency() const
+    {
+        return _transparency;
+    }
+
 protected:
     /// Return a container with all top level graphs use by this shader.
-    void getTopLevelShaderGraphs(ShaderGenerator& shadergen, std::deque<SgNodeGraph*>& graphs) const override;
+    void getTopLevelShaderGraphs(ShaderGenerator& shadergen, std::deque<ShaderGraph*>& graphs) const override;
 
 private:
     VariableBlock _vertexData;
     std::set<string> _calculatedVertexData;
+    bool _transparency;
 };
 
 } // namespace MaterialX

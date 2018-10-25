@@ -50,13 +50,20 @@ public:
 
     /// Generate a shader starting from the given element, translating 
     /// the element and all dependencies upstream into shader code.
-    ShaderPtr generate(const string& shaderName, ElementPtr element, const SgOptions& options) override;
-
-    /// Emit a shader uniform input variable
-    void emitUniform(const Shader::Variable& uniform, Shader& shader) override;
+    ShaderPtr generate(const string& shaderName, ElementPtr element, const GenOptions& options) override;
 
     /// Unique identifyer for this generator target
     static const string TARGET;
+
+protected:
+    /// Emit a shader input variable
+    void emitVariable(const Shader::Variable& variable, const string& qualifier, Shader& shader) override;
+
+    /// Create a new shader instance
+    virtual OgsFxShaderPtr createShader(const string& name);
+
+    /// Get parameters for the technique block
+    virtual void getTechniqueParams(const Shader& shader, string& params);
 };
 
 }

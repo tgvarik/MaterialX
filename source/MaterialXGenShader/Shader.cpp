@@ -2,8 +2,8 @@
 #include <MaterialXGenShader/ShaderGenerator.h>
 #include <MaterialXGenShader/Syntax.h>
 #include <MaterialXGenShader/Util.h>
-#include <MaterialXGenShader/Nodes/Compare.h>
-#include <MaterialXGenShader/Nodes/Switch.h>
+#include <MaterialXGenShader/Nodes/CompareNode.h>
+#include <MaterialXGenShader/Nodes/SwitchNode.h>
 
 #include <MaterialXCore/Document.h>
 #include <MaterialXCore/Node.h>
@@ -24,15 +24,16 @@ Shader::Shader(const string& name)
     _stages.push_back(Stage("Pixel"));
 
     // Create default uniform blocks for pixel stage
-    createUniformBlock(PIXEL_STAGE, PRIVATE_UNIFORMS, "prv");
-    createUniformBlock(PIXEL_STAGE, PUBLIC_UNIFORMS, "pub");
+    createUniformBlock(PIXEL_STAGE, PRIVATE_UNIFORMS, "prvUniform");
+    createUniformBlock(PIXEL_STAGE, PUBLIC_UNIFORMS, "pubUniform");
 }
 
-void Shader::initialize(ElementPtr element, ShaderGenerator& shadergen, const SgOptions& options)
+void Shader::initialize(ElementPtr element, ShaderGenerator& shadergen, const GenOptions& options)
 {
     // Create our shader generation root graph
-    _rootGraph = SgNodeGraph::create(_name, element, shadergen);
+    _rootGraph = ShaderGraph::create(_name, element, shadergen);
 
+    // Make it active
     pushActiveGraph(_rootGraph.get());
 
     // Set the vdirection to use for texture nodes
@@ -41,14 +42,14 @@ void Shader::initialize(ElementPtr element, ShaderGenerator& shadergen, const Sg
     _vdirection = vdir == "down" ? VDirection::DOWN : VDirection::UP;
 
     // Create shader variables for all nodes that need this (geometric nodes / input streams)
-    for (SgNode* node : _rootGraph->getNodes())
+    for (ShaderNode* node : _rootGraph->getNodes())
     {
-        SgImplementation* impl = node->getImplementation();
+        ShaderNodeImpl* impl = node->getImplementation();
         impl->createVariables(*node, shadergen, *this);
     }
 
     // Create uniforms for the public graph interface
-    for (SgInputSocket* inputSocket : _rootGraph->getInputSockets())
+    for (ShaderGraphInputSocket* inputSocket : _rootGraph->getInputSockets())
     {
         // Only for inputs that are connected/used internally
         if (inputSocket->connections.size())
@@ -59,12 +60,12 @@ void Shader::initialize(ElementPtr element, ShaderGenerator& shadergen, const Sg
     }
     
     // Check if a complete interface is requested
-    if (options.shaderInterfaceType == ShaderInterfaceType::COMPLETE)
+    if (options.shaderInterfaceType == SHADER_INTERFACE_COMPLETE)
     {
         // Create uniforms for all node inputs that has not been connected already
-        for (SgNode* node : _rootGraph->getNodes())
+        for (ShaderNode* node : _rootGraph->getNodes())
         {
-            for (SgInput* input : node->getInputs())
+            for (ShaderInput* input : node->getInputs())
             {
                 if (!input->connection)
                 {
@@ -77,7 +78,7 @@ void Shader::initialize(ElementPtr element, ShaderGenerator& shadergen, const Sg
                         // when node inputs change on application side.
                         const string interfaceName = node->getName() + "_" + input->name;
 
-                        SgInputSocket* inputSocket = _rootGraph->getInputSocket(interfaceName);
+                        ShaderGraphInputSocket* inputSocket = _rootGraph->getInputSocket(interfaceName);
                         if (!inputSocket)
                         {
                             inputSocket = _rootGraph->addInputSocket(interfaceName, input->type);
@@ -212,10 +213,10 @@ void Shader::addBlock(const string& str, ShaderGenerator& shadergen)
     }
 }
 
-void Shader::addFunctionDefinition(SgNode* node, ShaderGenerator& shadergen)
+void Shader::addFunctionDefinition(ShaderNode* node, ShaderGenerator& shadergen)
 {
     Stage& s = stage();
-    SgImplementation* impl = node->getImplementation();
+    ShaderNodeImpl* impl = node->getImplementation();
     if (s.definedFunctions.find(impl) == s.definedFunctions.end())
     {
         s.definedFunctions.insert(impl);
@@ -223,10 +224,10 @@ void Shader::addFunctionDefinition(SgNode* node, ShaderGenerator& shadergen)
     }
 }
 
-void Shader::addFunctionCall(SgNode* node, const SgNodeContext& context, ShaderGenerator& shadergen)
+void Shader::addFunctionCall(ShaderNode* node, const GenContext& context, ShaderGenerator& shadergen)
 {
-    SgImplementation* impl = node->getImplementation();
-    impl->emitFunctionCall(*node, context, shadergen, *this);
+    ShaderNodeImpl* impl = node->getImplementation();
+    impl->emitFunctionCall(*node, *(const_cast<GenContext*>(&context)), shadergen, *this);
 }
 
 void Shader::addInclude(const string& file, ShaderGenerator& shadergen)
@@ -255,6 +256,23 @@ void Shader::indent()
     {
         s.code += INDENTATION;
     }
+}
+
+void Shader::createConstant(size_t stage, const TypeDesc* type, const string& name, const string& semantic, ValuePtr value)
+{
+    Stage& s = _stages[stage];
+    if (s.constants.variableMap.find(name) == s.constants.variableMap.end())
+    {
+        VariablePtr variablePtr = std::make_shared<Variable>(type, name, semantic, value);
+        s.constants.variableMap[name] = variablePtr;
+        s.constants.variableOrder.push_back(variablePtr.get());
+    }
+}
+
+const Shader::VariableBlock& Shader::getConstantBlock(size_t stage) const
+{
+    const Stage& s = _stages[stage];
+    return s.constants;
 }
 
 void Shader::createUniformBlock(size_t stage, const string& block, const string& instance)
@@ -305,7 +323,7 @@ void Shader::createAppData(const TypeDesc* type, const string& name, const strin
     }
 }
 
-void Shader::getTopLevelShaderGraphs(ShaderGenerator& /*shadergen*/, std::deque<SgNodeGraph*>& graphs) const
+void Shader::getTopLevelShaderGraphs(ShaderGenerator& /*shadergen*/, std::deque<ShaderGraph*>& graphs) const
 {
     graphs.push_back(_rootGraph.get());
 }
