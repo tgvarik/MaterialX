@@ -44,11 +44,13 @@ before_deploy:
 artifacts:
     # Set artifact to be created zip.  Currently marked as pre-release
     - path: materialx-v1.36.2_shaderx-%VS_PLATFORM%-%CONFIGURATION%.zip 
-      name: MaterialX_ADSK
+      name: ShaderXPackage
 
 deploy:
     # Deploy on main working branch
-    - provider: GitHub
+    - release: v1.36.2_shaderx
+      provider: GitHub
+      artifact: ShaderXPackage
       prerelease: true
       on:
         VS_PLATFORM: Windows
