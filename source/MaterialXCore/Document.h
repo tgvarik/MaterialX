@@ -49,7 +49,7 @@ class Document : public GraphElement
     virtual void initialize();
 
     /// Create a deep copy of the document.
-    virtual DocumentPtr copy()
+    virtual DocumentPtr copy() const
     {
         DocumentPtr doc = createDocument<Document>();
         doc->copyContentFrom(getSelf());
@@ -178,13 +178,13 @@ class Document : public GraphElement
 
     /// Add a GeomPropDef to the document.
     /// @param name The name of the new GeomPropDef.
-    /// @param node The geometric node to use for the GeomPropDef.
+    /// @param geomprop The geometric property to use for the GeomPropDef.
     /// @return A shared pointer to the new GeomPropDef.
-    GeomPropDefPtr addGeomPropDef(const string& name, const string& node)
+    GeomPropDefPtr addGeomPropDef(const string& name, const string& geomprop)
     {
-        GeomPropDefPtr geomProp = addChild<GeomPropDef>(name);
-        geomProp->setNode(node);
-        return geomProp;
+        GeomPropDefPtr geomPropDef = addChild<GeomPropDef>(name);
+        geomPropDef->setGeomProp(geomprop);
+        return geomPropDef;
     }
 
     /// Return the GeomPropDef, if any, with the given name.
@@ -203,7 +203,7 @@ class Document : public GraphElement
     void removeGeomPropDef(const string& name)
     {
         removeChildOfType<GeomPropDef>(name);
-    }    
+    }
 
     /// @}
     /// @name Look Elements

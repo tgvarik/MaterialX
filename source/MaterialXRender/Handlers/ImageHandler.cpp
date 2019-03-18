@@ -1,3 +1,8 @@
+//
+// TM & (c) 2017 Lucasfilm Entertainment Company Ltd. and Lucasfilm Ltd.
+// All rights reserved.  See LICENSE.txt for license.
+//
+
 #include <MaterialXCore/Types.h>
 #include <MaterialXGenShader/Util.h>
 #include <MaterialXRender/Handlers/ImageHandler.h>
@@ -15,6 +20,9 @@ std::string ImageLoader::PIC_EXTENSION = "pic";
 std::string ImageLoader::PNG_EXTENSION = "png";
 std::string ImageLoader::PSD_EXTENSION = "psd";
 std::string ImageLoader::TGA_EXTENSION = "tga";
+std::string ImageLoader::TIF_EXTENSION = "tif";
+std::string ImageLoader::TIFF_EXTENSION = "tiff";
+std::string ImageLoader::TXT_EXTENSION = "txt";
 
 ImageHandler::ImageHandler(ImageLoaderPtr imageLoader)
 {
@@ -30,17 +38,19 @@ void ImageHandler::addLoader(ImageLoaderPtr loader)
     }
 }
 
-bool ImageHandler::saveImage(const std::string& fileName,
+bool ImageHandler::saveImage(const FilePath& filePath,
                             const ImageDesc &imageDesc)
 {
+    FilePath foundFilePath = findFile(filePath);
+
     std::pair <ImageLoaderMap::iterator, ImageLoaderMap::iterator> range;
-    string extension = MaterialX::getFileExtension(fileName);
+    string extension = MaterialX::getFileExtension(foundFilePath);
     range = _imageLoaders.equal_range(extension);
     ImageLoaderMap::iterator first = --range.second;
     ImageLoaderMap::iterator last = --range.first;
     for (auto it = first; it != last; --it)
     {
-        bool saved = it->second->saveImage(fileName, imageDesc);
+        bool saved = it->second->saveImage(foundFilePath, imageDesc);
         if (saved)
         {
             return true;
@@ -49,16 +59,18 @@ bool ImageHandler::saveImage(const std::string& fileName,
     return false;
 }
 
-bool ImageHandler::acquireImage(const std::string& fileName, ImageDesc &imageDesc, bool generateMipMaps, const std::array<float, 4>* /*fallbackColor*/)
+bool ImageHandler::acquireImage(const FilePath& filePath, ImageDesc &imageDesc, bool generateMipMaps, const std::array<float, 4>* /*fallbackColor*/)
 {
+    FilePath foundFilePath = findFile(filePath);
+
     std::pair <ImageLoaderMap::iterator, ImageLoaderMap::iterator> range;
-    string extension = MaterialX::getFileExtension(fileName);
+    string extension = MaterialX::getFileExtension(foundFilePath);
     range = _imageLoaders.equal_range(extension);
     ImageLoaderMap::iterator first = --range.second;
     ImageLoaderMap::iterator last= --range.first;
     for (auto it = first; it != last; --it)
     {
-        bool acquired = it->second->acquireImage(fileName, imageDesc, generateMipMaps);
+        bool acquired = it->second->acquireImage(foundFilePath, imageDesc, generateMipMaps);
         if (acquired)
         {
             return true;
@@ -109,5 +121,16 @@ const ImageDesc* ImageHandler::getCachedImage(const std::string& identifier)
     }
     return nullptr;
 }
+
+void ImageHandler::setSearchPath(const FileSearchPath& path)
+{
+    _searchPath = path;
+}
+
+FilePath ImageHandler::findFile(const FilePath& filePath)
+{
+    return _searchPath.find(filePath);
+}
+
 
 }
