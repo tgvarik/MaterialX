@@ -17,7 +17,7 @@
 
 namespace mx = MaterialX;
 
-TEST_CASE("GLSL Syntax Check", "[genglsl]")
+TEST_CASE("GenShader: GLSL Syntax Check", "[genglsl]")
 {
     mx::SyntaxPtr syntax = mx::GlslSyntax::create();
 
@@ -76,21 +76,16 @@ TEST_CASE("GLSL Syntax Check", "[genglsl]")
     REQUIRE(value == "int[7](1, 2, 3, 4, 5, 6, 7)");
 }
 
-TEST_CASE("GLSL Implementation Check", "[genglsl]")
+TEST_CASE("GenShader: GLSL Implementation Check", "[genglsl]")
 {
     mx::GenContext context(mx::GlslShaderGenerator::create());
 
     mx::StringSet generatorSkipNodeTypes;
     mx::StringSet generatorSkipNodeDefs;
-    generatorSkipNodeDefs.insert("ND_add_surfaceshader");
-    generatorSkipNodeDefs.insert("ND_multiply_surfaceshaderF");
-    generatorSkipNodeDefs.insert("ND_multiply_surfaceshaderC");
-    generatorSkipNodeDefs.insert("ND_mix_surfaceshader");
-
-    GenShaderUtil::checkImplementations(context, generatorSkipNodeTypes, generatorSkipNodeDefs);
+    GenShaderUtil::checkImplementations(context, generatorSkipNodeTypes, generatorSkipNodeDefs, 34);
 }
 
-TEST_CASE("GLSL Unique Names", "[genglsl]")
+TEST_CASE("GenShader: GLSL Unique Names", "[genglsl]")
 {
     mx::GenContext context(mx::GlslShaderGenerator::create());
 
@@ -100,7 +95,7 @@ TEST_CASE("GLSL Unique Names", "[genglsl]")
     GenShaderUtil::testUniqueNames(context, mx::Stage::PIXEL);
 }
 
-TEST_CASE("Bind Light Shaders", "[genglsl]")
+TEST_CASE("GenShader: Bind Light Shaders", "[genglsl]")
 {
     mx::DocumentPtr doc = mx::createDocument();
 
@@ -134,7 +129,7 @@ static void generateGLSLCode()
     tester.testGeneration(genOptions);
 }
 
-TEST_CASE("GLSL Shader Generation", "[genglsl]")
+TEST_CASE("GenShader: GLSL Shader Generation", "[genglsl]")
 {
     generateGLSLCode();
 }

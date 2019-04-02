@@ -28,7 +28,7 @@ ShaderGraph::ShaderGraph(const ShaderGraph* parent, const string& name, ConstDoc
 
 void ShaderGraph::addInputSockets(const InterfaceElement& elem, GenContext& context)
 {
-    for (ValueElementPtr port : elem.getChildrenOfType<ValueElement>())
+    for (ValueElementPtr port : elem.getActiveValueElements())
     {
         if (!port->isA<Output>())
         {
@@ -53,9 +53,10 @@ void ShaderGraph::addInputSockets(const InterfaceElement& elem, GenContext& cont
 
 void ShaderGraph::addOutputSockets(const InterfaceElement& elem)
 {
-    for (const OutputPtr& output : elem.getOutputs())
+    for (const OutputPtr& output : elem.getActiveOutputs())
     {
-        addOutputSocket(output->getName(), TypeDesc::get(output->getType()));
+        ShaderGraphOutputSocket* outputSocket = addOutputSocket(output->getName(), TypeDesc::get(output->getType()));
+        outputSocket->setChannels(output->getChannels());
     }
     if (numOutputSockets() == 0)
     {
@@ -197,7 +198,7 @@ void ShaderGraph::addDefaultGeomNode(ShaderInput* input, const GeomPropDef& geom
         if (!space.empty())
         {
             ShaderInput* spaceInput = geomNode->getInput(GeomPropDef::SPACE_ATTRIBUTE);
-            ValueElementPtr nodeDefSpaceInput = geomNodeDef->getChildOfType<ValueElement>(GeomPropDef::SPACE_ATTRIBUTE);
+            ValueElementPtr nodeDefSpaceInput = geomNodeDef->getActiveValueElement(GeomPropDef::SPACE_ATTRIBUTE);
             if (spaceInput && nodeDefSpaceInput)
             {
                 std::pair<const TypeDesc*, ValuePtr> enumResult;
@@ -319,7 +320,7 @@ ShaderGraphPtr ShaderGraph::create(const ShaderGraph* parent, const NodeGraph& n
     graph->addOutputSockets(nodeGraph);
 
     // Traverse all outputs and create all upstream dependencies
-    for (OutputPtr graphOutput : nodeGraph.getOutputs())
+    for (OutputPtr graphOutput : nodeGraph.getActiveOutputs())
     {
         graph->addUpstreamDependencies(*graphOutput, nullptr, context);
     }
@@ -379,6 +380,7 @@ ShaderGraphPtr ShaderGraph::create(const ShaderGraph* parent, const string& name
         // Create the given output socket
         ShaderGraphOutputSocket* outputSocket = graph->addOutputSocket(output->getName(), TypeDesc::get(output->getType()));
         outputSocket->setPath(output->getNamePath());
+        outputSocket->setChannels(output->getChannels());
 
         // Start traversal from this output
         root = output;
@@ -412,7 +414,7 @@ ShaderGraphPtr ShaderGraph::create(const ShaderGraph* parent, const string& name
         outputSocket->makeConnection(newNode->getOutput());
 
         // Handle node parameters
-        for (ParameterPtr elem : nodeDef->getParameters())
+        for (ParameterPtr elem : nodeDef->getActiveParameters())
         {
             ShaderGraphInputSocket* inputSocket = graph->getInputSocket(elem->getName());
             ShaderInput* input = newNode->getInput(elem->getName());
@@ -438,7 +440,7 @@ ShaderGraphPtr ShaderGraph::create(const ShaderGraph* parent, const string& name
         }
 
         // Handle node inputs
-        for (const InputPtr& nodeDefInput : nodeDef->getInputs())
+        for (const InputPtr& nodeDefInput : nodeDef->getActiveInputs())
         {
             ShaderGraphInputSocket* inputSocket = graph->getInputSocket(nodeDefInput->getName());
             ShaderInput* input = newNode->getInput(nodeDefInput->getName());
@@ -478,9 +480,8 @@ ShaderGraphPtr ShaderGraph::create(const ShaderGraph* parent, const string& name
         }
 
         // Add shareRef nodedef paths
-        const vector<InputPtr> nodeInputs = nodeDef->getChildrenOfType<Input>();
         const string& nodePath = shaderRef->getNamePath();
-        for (const ValueElementPtr& nodeInput : nodeInputs)
+        for (const ValueElementPtr& nodeInput : nodeDef->getActiveInputs())
         {
             const string& inputName = nodeInput->getName();
             const string path = nodePath + NAME_PATH_SEPARATOR + inputName;
@@ -495,8 +496,7 @@ ShaderGraphPtr ShaderGraph::create(const ShaderGraph* parent, const string& name
                 inputSocket->setPath(path);
             }
         }
-        const vector<ParameterPtr> nodeParameters = nodeDef->getChildrenOfType<Parameter>();
-        for (const ParameterPtr& nodeParameter : nodeParameters)
+        for (const ParameterPtr& nodeParameter : nodeDef->getActiveParameters())
         {
             const string& paramName = nodeParameter->getName();
             const string path = nodePath + NAME_PATH_SEPARATOR + paramName;
@@ -578,7 +578,7 @@ ShaderNode* ShaderGraph::addNode(const Node& node, GenContext& context)
 
     // Handle the "defaultgeomprop" directives on the nodedef inputs.
     // Create and connect default geometric nodes on unconnected inputs.
-    for (const InputPtr& nodeDefInput : nodeDef->getInputs())
+    for (const InputPtr& nodeDefInput : nodeDef->getActiveInputs())
     {
         ShaderInput* input = newNode->getInput(nodeDefInput->getName());
         InputPtr nodeInput = node.getInput(nodeDefInput->getName());
@@ -686,7 +686,7 @@ void ShaderGraph::finalize(GenContext& context)
     _outputColorTransformMap.clear();
 
     // Optimize the graph, removing redundant paths.
-    optimize();
+    optimize(context);
 
     if (context.getOptions().shaderInterfaceType == SHADER_INTERFACE_COMPLETE)
     {
@@ -764,7 +764,7 @@ void ShaderGraph::disconnect(ShaderNode* node) const
     }
 }
 
-void ShaderGraph::optimize()
+void ShaderGraph::optimize(GenContext& context)
 {
     size_t numEdits = 0;
     for (ShaderNode* node : getNodes())
@@ -777,7 +777,7 @@ void ShaderGraph::optimize()
             ShaderInput* valueInput = node->getInput(0);
             if (!valueInput->getConnection())
             {
-                bypass(node, 0);
+                bypass(context, node, 0);
                 ++numEdits;
             }
         }
@@ -794,7 +794,7 @@ void ShaderGraph::optimize()
                 const int branch = (intestValue <= cutoff->getValue()->asA<float>() ? 2 : 3);
 
                 // Bypass the conditional using the taken branch
-                bypass(node, branch);
+                bypass(context, node, branch);
 
                 ++numEdits;
             }
@@ -812,7 +812,7 @@ void ShaderGraph::optimize()
                     (which->getType() == Type::FLOAT ? value->asA<float>() : value->asA<int>())));
 
                 // Bypass the conditional using the taken branch
-                bypass(node, branch);
+                bypass(context, node, branch);
 
                 ++numEdits;
             }
@@ -853,7 +853,7 @@ void ShaderGraph::optimize()
     }
 }
 
-void ShaderGraph::bypass(ShaderNode* node, size_t inputIndex, size_t outputIndex)
+void ShaderGraph::bypass(GenContext& context, ShaderNode* node, size_t inputIndex, size_t outputIndex)
 {
     ShaderInput* input = node->getInput(inputIndex);
     ShaderOutput* output = node->getOutput(outputIndex);
@@ -883,6 +883,19 @@ void ShaderGraph::bypass(ShaderNode* node, size_t inputIndex, size_t outputIndex
             output->breakConnection(downstream);
             downstream->setValue(input->getValue());
             downstream->setPath(input->getPath());
+
+            // Swizzle the input value. Once done clear the channel to indicate
+            // no further swizzling is reqiured.
+            const string& channels = downstream->getChannels();
+            if (!channels.empty())
+            {
+                downstream->setValue(context.getShaderGenerator().getSyntax().getSwizzledValue(input->getValue(),
+                                                                                          input->getType(), 
+                                                                                          channels,
+                                                                                          downstream->getType()));
+                downstream->setType(downstream->getType());
+                downstream->setChannels(EMPTY_STRING);
+            }
         }
     }
 }

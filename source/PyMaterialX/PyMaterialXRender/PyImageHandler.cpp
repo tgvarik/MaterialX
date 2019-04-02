@@ -18,18 +18,19 @@ class PyImageLoader : public mx::ImageLoader
     {
     }
 
-    bool saveImage(const mx::FilePath& filePath, const mx::ImageDesc &imageDesc) override
+    bool saveImage(const mx::FilePath& filePath, const mx::ImageDesc &imageDesc, bool verticalFlip) override
     {
         PYBIND11_OVERLOAD_PURE(
             bool,
             mx::ImageLoader,
             saveImage,
             filePath,
-            imageDesc
+            imageDesc,
+            verticalFlip
         );
     }
 
-    bool acquireImage(const mx::FilePath& filePath, mx::ImageDesc &imageDesc, bool generateMipMaps) override
+    bool acquireImage(const mx::FilePath& filePath, mx::ImageDesc &imageDesc, const mx::ImageDescRestrictions* restrictions = nullptr) override
     {
         PYBIND11_OVERLOAD_PURE(
             bool,
@@ -37,7 +38,7 @@ class PyImageLoader : public mx::ImageLoader
             acquireImage,
             filePath,
             imageDesc,
-            generateMipMaps
+            restrictions
         );
     }
 
@@ -51,18 +52,19 @@ class PyImageHandler : public mx::ImageHandler
     {
     }
 
-    bool saveImage(const mx::FilePath& filePath, const mx::ImageDesc &imageDesc) override
+    bool saveImage(const mx::FilePath& filePath, const mx::ImageDesc &imageDesc, bool verticalFlip = false) override
     {
         PYBIND11_OVERLOAD(
             bool,
             mx::ImageHandler,
             saveImage,
             filePath,
-            imageDesc
+            imageDesc,
+            verticalFlip
         );
     }
 
-    bool acquireImage(const mx::FilePath& filePath, mx::ImageDesc& desc, bool generateMipMaps, const std::array<float, 4>* fallbackColor) override
+    bool acquireImage(const mx::FilePath& filePath, mx::ImageDesc& desc, bool generateMipMaps, const mx::Color4* fallbackColor) override
     {
         PYBIND11_OVERLOAD(
             bool,
@@ -75,7 +77,7 @@ class PyImageHandler : public mx::ImageHandler
         );
     }
 
-    bool createColorImage(const std::array<float,4>& color, mx::ImageDesc& imageDesc) override
+    bool createColorImage(const mx::Color4& color, mx::ImageDesc& imageDesc) override
     {
         PYBIND11_OVERLOAD(
             bool,
@@ -88,7 +90,7 @@ class PyImageHandler : public mx::ImageHandler
 
     bool bindImage(const std::string& identifier, const mx::ImageSamplingProperties& samplingProperties) override
     {
-        PYBIND11_OVERLOAD_PURE(
+        PYBIND11_OVERLOAD(
             bool,
             mx::ImageHandler,
             bindImage,
@@ -109,7 +111,7 @@ class PyImageHandler : public mx::ImageHandler
   protected:
     void deleteImage(mx::ImageDesc& imageDesc) override
     {
-        PYBIND11_OVERLOAD_PURE(
+        PYBIND11_OVERLOAD(
             void,
             mx::ImageHandler,
             deleteImage,
@@ -126,7 +128,7 @@ void bindPyImageHandler(py::module& mod)
         .def_readwrite("channelCount", &mx::ImageDesc::channelCount)
         .def_readwrite("mipCount", &mx::ImageDesc::mipCount)
         .def_readwrite("resourceBuffer", &mx::ImageDesc::resourceBuffer)
-        .def_readwrite("floatingPoint", &mx::ImageDesc::floatingPoint)
+        .def_readwrite("baseType", &mx::ImageDesc::baseType)
         .def_readwrite("resourceId", &mx::ImageDesc::resourceId)
         .def("computeMipCount", &mx::ImageDesc::computeMipCount);
 
@@ -157,6 +159,7 @@ void bindPyImageHandler(py::module& mod)
 
     py::class_<mx::ImageHandler, PyImageHandler, mx::ImageHandlerPtr>(mod, "ImageHandler")
         .def(py::init<mx::ImageLoaderPtr>())
+        .def_static("create", &mx::ImageHandler::create)
         .def("addLoader", &mx::ImageHandler::addLoader)
         .def("saveImage", &mx::ImageHandler::saveImage)
         .def("acquireImage", &mx::ImageHandler::acquireImage)

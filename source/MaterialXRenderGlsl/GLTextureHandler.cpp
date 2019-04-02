@@ -10,7 +10,14 @@
 
 namespace MaterialX
 {
-bool GLTextureHandler::createColorImage(const std::array<float,4>& color,
+GLTextureHandler::GLTextureHandler(ImageLoaderPtr imageLoader) :
+    ParentClass(imageLoader),
+    _maxImageUnits(-1)
+{
+    _restrictions.supportedBaseTypes = { ImageDesc::BASETYPE_HALF, ImageDesc::BASETYPE_FLOAT, ImageDesc::BASETYPE_UINT8 };
+}
+
+bool GLTextureHandler::createColorImage(const Color4& color,
                                         ImageDesc& imageDesc)
 {
     if (!glActiveTexture)
@@ -37,7 +44,7 @@ bool GLTextureHandler::createColorImage(const std::array<float,4>& color,
 bool GLTextureHandler::acquireImage(const FilePath& filePath,
                                     ImageDesc &imageDesc,
                                     bool generateMipMaps,
-                                    const std::array<float,4>* fallbackColor)
+                                    const Color4* fallbackColor)
 {
     if (filePath.isEmpty())
     {
@@ -67,7 +74,20 @@ bool GLTextureHandler::acquireImage(const FilePath& filePath,
         glActiveTexture(GL_TEXTURE0 + imageDesc.resourceId);
         glBindTexture(GL_TEXTURE_2D, imageDesc.resourceId);
 
-        GLint internalFormat = imageDesc.floatingPoint ? GL_RGBA32F : GL_RGBA;
+        GLint internalFormat = GL_RGBA;
+        GLenum type = GL_UNSIGNED_BYTE;
+
+        if (imageDesc.baseType == ImageDesc::BASETYPE_FLOAT)
+        {
+            internalFormat = GL_RGBA32F;
+            type = GL_FLOAT;
+        }
+        else if (imageDesc.baseType == ImageDesc::BASETYPE_HALF)
+        {
+            internalFormat = GL_RGBA16F;
+            type = GL_HALF_FLOAT;
+        }
+
         GLint format = GL_RGBA;
         switch (imageDesc.channelCount)
         {
@@ -100,7 +120,7 @@ bool GLTextureHandler::acquireImage(const FilePath& filePath,
         }
 
         glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, imageDesc.width, imageDesc.height,
-            0, format, imageDesc.floatingPoint ? GL_FLOAT : GL_UNSIGNED_BYTE, imageDesc.resourceBuffer);
+            0, format, type, imageDesc.resourceBuffer);
 
         if (generateMipMaps)
         {
@@ -122,7 +142,7 @@ bool GLTextureHandler::acquireImage(const FilePath& filePath,
         desc.channelCount = 4;
         desc.width = 1;
         desc.height = 1;
-        desc.floatingPoint = true;
+        desc.baseType = ImageDesc::BASETYPE_FLOAT;
         createColorImage(*fallbackColor, desc);
         cacheImage(filePath, desc);
         textureLoaded = true;
@@ -234,12 +254,9 @@ void GLTextureHandler::deleteImage(MaterialX::ImageDesc& imageDesc)
         glDeleteTextures(1, &imageDesc.resourceId);
         imageDesc.resourceId = MaterialX::GlslProgram::UNDEFINED_OPENGL_RESOURCE_ID;
     }
+
     // Delete any CPU side memory
-    if (imageDesc.resourceBuffer)
-    {
-        free(imageDesc.resourceBuffer);
-        imageDesc.resourceBuffer = nullptr;
-    }
+    ParentClass::deleteImage(imageDesc);
 }
 
 }

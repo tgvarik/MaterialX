@@ -72,7 +72,8 @@ bool getShaderSource(mx::GenContext& context,
 // Check that implementations exist for all nodedefs supported per generator
 void checkImplementations(mx::GenContext& context,
                           const mx::StringSet& generatorSkipNodeTypes,
-                          const mx::StringSet& generatorSkipNodeDefs)
+                          const mx::StringSet& generatorSkipNodeDefs,
+                          unsigned int expectedSkipCount)
 {
     mx::DocumentPtr doc = mx::createDocument();
 
@@ -244,7 +245,7 @@ void checkImplementations(mx::GenContext& context,
                     else
                     {
                         found_str += "Found impl and src for nodedef: " + nodeDefName + ", Node: "
-                            + nodeName + +". Impl: " + impl->getName() + "Path: " + resolvedPath.asString() + ".\n";
+                            + nodeName + +". Impl: " + impl->getName() + ". Path: " + resolvedPath.asString() + ".\n";
                     }
                 }
             }
@@ -271,7 +272,7 @@ void checkImplementations(mx::GenContext& context,
 
     // Should have 0 missing including skipped
     REQUIRE(missing == 0);
-    REQUIRE(skipped == 38);
+    REQUIRE(skipped == expectedSkipCount);
 
     implDumpBuffer.close();
 }
@@ -323,7 +324,7 @@ bool ShaderGeneratorTester::generateCode(mx::GenContext& context, const std::str
     {
         shader = context.getShaderGenerator().generate(shaderName, element, context);
     }
-    catch (mx::ExceptionShaderGenError& e)
+    catch (mx::Exception& e)
     {
         log << ">> Code generation failure: " << e.what() << "\n";
         shader = nullptr;
@@ -504,7 +505,7 @@ void ShaderGeneratorTester::testGeneration(const mx::GenOptions& generateOptions
         {
             mx::findRenderableElements(doc, elements);
         }
-        catch (mx::ExceptionShaderGenError& e)
+        catch (mx::Exception& e)
         {
             _logFile << "Renderables search errors: " << e.what() << std::endl;
         }
@@ -521,9 +522,9 @@ void ShaderGeneratorTester::testGeneration(const mx::GenOptions& generateOptions
         bool docValid = doc->validate(&message);
         if (!docValid)
         {
-            WARN("[" + doc->getSourceUri() + "] " + message);
+            _logFile << "Document is invalid: [" << doc->getSourceUri() << "] " << message;
         }
-        REQUIRE(docValid);
+        CHECK(docValid);
 
         // Traverse the renderable documents and run validation the validation step
         int missingNodeDefs = 0;

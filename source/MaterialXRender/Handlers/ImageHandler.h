@@ -24,18 +24,36 @@ namespace MaterialX
 class ImageDesc
 {
   public:
+    /// Image base type identifier
+    using BaseType = string;
+    /// Set of base type identifiers
+    using BaseTypeSet = std::set<BaseType>;
+
+    /// Preset base type identifiers
+    static BaseType BASETYPE_UINT8;
+    static BaseType BASETYPE_HALF;
+    static BaseType BASETYPE_FLOAT;
+
+    /// Image type identifier
+    using ImageType = string;
+
+    /// Preset image type identifiers
+    static ImageType IMAGETYPE_2D;
+
     /// Image width
-    unsigned width = 0; 
+    unsigned int width = 0; 
     /// Image height
-    unsigned height = 0;
+    unsigned int height = 0;
     /// Number of channels
     unsigned int channelCount = 0;
     /// Number of mip map levels
     unsigned int mipCount = 0;
     /// CPU buffer. May be empty
     void* resourceBuffer = nullptr;
-    /// Is buffer floating point
-    bool floatingPoint = true;
+    /// Base type
+    BaseType baseType = BASETYPE_UINT8;
+    /// Image Type
+    ImageType imageType = IMAGETYPE_2D;
     /// Hardware target dependent resource identifier. May be undefined.
     unsigned int resourceId = 0;
 
@@ -44,6 +62,14 @@ class ImageDesc
     {
         mipCount = (unsigned int)std::log2(std::max(width, height)) + 1;
     }
+};
+
+/// Structure containing harware image description restrictions
+class ImageDescRestrictions
+{
+  public:
+    /// List of base types that can be supported
+    ImageDesc::BaseTypeSet supportedBaseTypes;
 };
 
 /// @class ImageSamplingProperties
@@ -58,11 +84,11 @@ class ImageSamplingProperties
     /// Filter type
     int filterType = -1;
     /// Default color
-    std::array<float, 4> defaultColor = { { 0.0f, 0.0f, 0.0f, 1.0f } };
+    Color4 defaultColor = { 0.0f, 0.0f, 0.0f, 1.0f };
 };
 
 /// Image description cache
-using ImageDescCache = std::unordered_map<std::string, ImageDesc>;
+using ImageDescCache = std::unordered_map<string, ImageDesc>;
 
 /// Shared pointer to an ImageLoader
 using ImageLoaderPtr = std::shared_ptr<class ImageLoader>;
@@ -80,23 +106,25 @@ class ImageLoader
     virtual ~ImageLoader() {}
 
     /// Stock extension names
-    static std::string BMP_EXTENSION;
-    static std::string EXR_EXTENSION;
-    static std::string GIF_EXTENSION;
-    static std::string HDR_EXTENSION;
-    static std::string JPG_EXTENSION;
-    static std::string JPEG_EXTENSION;
-    static std::string PIC_EXTENSION;
-    static std::string PNG_EXTENSION;
-    static std::string PSD_EXTENSION;
-    static std::string TGA_EXTENSION;
-    static std::string TIF_EXTENSION;
-    static std::string TIFF_EXTENSION;
-    static std::string TXT_EXTENSION;
+    static string BMP_EXTENSION;
+    static string EXR_EXTENSION;
+    static string GIF_EXTENSION;
+    static string HDR_EXTENSION;
+    static string JPG_EXTENSION;
+    static string JPEG_EXTENSION;
+    static string PIC_EXTENSION;
+    static string PNG_EXTENSION;
+    static string PSD_EXTENSION;
+    static string TGA_EXTENSION;
+    static string TIF_EXTENSION;
+    static string TIFF_EXTENSION;
+    static string TXT_EXTENSION;
+    static string TX_EXTENSION;
+    static string TXR_EXTENSION;
 
     /// Returns a list of supported extensions
     /// @return List of support extensions
-    const StringVec& supportedExtensions()
+    const StringSet& supportedExtensions()
     {
         return _extensions;
     }
@@ -105,26 +133,30 @@ class ImageLoader
     /// @param filePath Path to save image to
     /// @param imageDesc Description of image
     /// @return if save succeeded
+    /// @param verticalFlip Whether the image should be flipped in Y during save
+    /// @return if save succeeded
     virtual bool saveImage(const FilePath& filePath,
-                           const ImageDesc &imageDesc) = 0;
+                           const ImageDesc &imageDesc,
+                           bool verticalFlip = false) = 0;
 
     /// Acquire an image from disk. This method must be implemented by derived classes.
     /// @param filePath Path to load image from
     /// @param imageDesc Description of image updated during load.
-    /// @param generateMipMaps Generate mip maps if supported.
+    /// @param restrictions Hardware image description restrictions. Default value is nullptr, meaning no restrictions.
     /// @return if load succeeded
-    virtual bool acquireImage(const FilePath& filePath, ImageDesc &imageDesc, bool generateMipMaps) = 0;
+    virtual bool acquireImage(const FilePath& filePath, ImageDesc &imageDesc, 
+                              const ImageDescRestrictions* restrictions = nullptr) = 0;
 
   protected:
     /// List of supported string extensions
-    StringVec _extensions;
+    StringSet _extensions;
 };
 
 /// Shared pointer to an ImageHandler
 using ImageHandlerPtr = std::shared_ptr<class ImageHandler>;
 
 /// Map of extensions to image loaders
-using ImageLoaderMap = std::multimap<std::string, ImageLoaderPtr>;
+using ImageLoaderMap = std::multimap<string, ImageLoaderPtr>;
 
 /// @class @ImageHandler
 /// A image handler class. Keeps track of images which are loaded
@@ -138,21 +170,31 @@ class ImageHandler
     /// Constructor. Assume at least one loader must be supplied.
     ImageHandler(ImageLoaderPtr imageLoader);
 
+    /// Static instance create function
+    static ImageHandlerPtr create(ImageLoaderPtr imageLoader)
+    {
+        return std::make_shared<ImageHandler>(imageLoader);
+    }
+
     /// Add additional image loaders. Useful to handle different file
     /// extensions
     /// @param loader Loader to add to list of available loaders.
     void addLoader(ImageLoaderPtr loader);
     
     /// Default destructor
-    virtual ~ImageHandler() {}
+    virtual ~ImageHandler() { };
+
+    /// Get a list of extensions supported by the handler
+    void supportedExtensions(StringSet& extensions);
 
     /// Save image to disk. This method must be implemented by derived classes.
     /// The first image loader which supports the file name extension will be used.
     /// @param filePath Name of file to save image to
-    /// @param imageDesc Description of image
+    /// @param verticalFlip Whether the image should be flipped in Y during save
     /// @return if save succeeded
     virtual bool saveImage(const FilePath& filePath,
-                           const ImageDesc &imageDesc);
+                           const ImageDesc &imageDesc,
+                           bool verticalFlip = false);
 
     /// Acquire an image from disk. This method must be implemented by derived classes.
     /// The first image loader which supports the file name extension will be used.
@@ -162,21 +204,21 @@ class ImageHandler
     /// @param fallbackColor Color of fallback image to use if failed to load.  If null is specified then
     /// no fallback image will be acquired.
     /// @return if load succeeded in loading image or created fallback image.
-    virtual bool acquireImage(const FilePath& filePath, ImageDesc& desc, bool generateMipMaps, const std::array<float, 4>* fallbackColor);
+    virtual bool acquireImage(const FilePath& filePath, ImageDesc& desc, bool generateMipMaps, const Color4* fallbackColor);
 
     /// Utility to create a solid color color image 
     /// @param color Color to set
     /// @param imageDesc Description of image updated during load.
     /// @return if creation succeeded
-    virtual bool createColorImage(const std::array<float,4>& color,
+    virtual bool createColorImage(const Color4& color,
                                   ImageDesc& imageDesc);
  
-    /// Bind an image. Derived classes must implement this method
-    /// to handle logical binding of an image resource.
+    /// Bind an image. Derived classes should implement this method to handle logical binding of 
+    /// an image resource. The default implementation performs no action.
     /// @param identifier Identifier for image description to bind.
     /// @param samplingProperties Sampling properties for the image
     /// @return true if succeded to bind
-    virtual bool bindImage(const std::string& identifier, const ImageSamplingProperties& samplingProperties) = 0;
+    virtual bool bindImage(const string& identifier, const ImageSamplingProperties& samplingProperties);
 
     /// Clear the contents of the image cache.
     /// deleteImage() will be called for each cache description to 
@@ -202,16 +244,16 @@ class ImageHandler
     /// Cache an image for reuse.
     /// @param identifier Description identifier to use.
     /// @param imageDesc Image description to cache
-    void cacheImage(const std::string& identifier, const ImageDesc& imageDesc);
+    void cacheImage(const string& identifier, const ImageDesc& imageDesc);
 
     /// Remove image description from the cache.
     /// @param identifier Identifier of description to remove.
-    void uncacheImage(const std::string& identifier);
+    void uncacheImage(const string& identifier);
 
     /// Get an image description in the image cache if it exists
     /// @param identifier Description to search for.
     /// @return A null ptr is returned if not found.
-    const ImageDesc* getCachedImage(const std::string& identifier);
+    const ImageDesc* getCachedImage(const string& identifier);
 
     /// Return a reference to the image cache
     ImageDescCache& getImageCache()
@@ -221,9 +263,14 @@ class ImageHandler
 
     /// Delete an image
     /// @param imageDesc Image description indicate which image to delete.
-    /// Derived classes must implement this method to clean up resources
-    /// when the image cache is cleared.
-    virtual void deleteImage(ImageDesc& imageDesc) = 0;
+    /// Derived classes should override this method to clean up any related resources
+    /// an image is deleted from the handler.
+    virtual void deleteImage(ImageDesc& imageDesc);
+
+    /// Return image description restrictions. By default nullptr is
+    /// returned meaning no restrictions. Derived classes can override
+    /// this to add restrictions specific to that handler.
+    virtual const ImageDescRestrictions* getRestrictions() const { return nullptr; }
 
     /// Image loader utilities
     ImageLoaderMap _imageLoaders;

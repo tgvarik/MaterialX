@@ -17,7 +17,7 @@
 
 namespace mx = MaterialX;
 
-TEST_CASE("OGSFX Syntax", "[genogsfx]")
+TEST_CASE("GenShader: OGSFX Syntax", "[genogsfx]")
 {
     mx::SyntaxPtr syntax = mx::OgsFxSyntax::create();
 
@@ -62,28 +62,23 @@ TEST_CASE("OGSFX Syntax", "[genogsfx]")
     REQUIRE(value == "{1.0, 2.0, 3.0, 4.0}");
 }
 
-TEST_CASE("OGSFX Implementation Check", "[genogsfx]")
+TEST_CASE("GenShader: OGSFX Implementation Check", "[genogsfx]")
 {
     mx::GenContext context(mx::OgsFxShaderGenerator::create());
 
     mx::StringSet generatorSkipNodeTypes;
     mx::StringSet generatorSkipNodeDefs;
-    generatorSkipNodeDefs.insert("ND_add_surfaceshader");
-    generatorSkipNodeDefs.insert("ND_multiply_surfaceshaderF");
-    generatorSkipNodeDefs.insert("ND_multiply_surfaceshaderC");
-    generatorSkipNodeDefs.insert("ND_mix_surfaceshader");
-
-    GenShaderUtil::checkImplementations(context, generatorSkipNodeTypes, generatorSkipNodeDefs);
+    GenShaderUtil::checkImplementations(context, generatorSkipNodeTypes, generatorSkipNodeDefs, 34);
 }
 
-TEST_CASE("OGSFX Unique Names", "[genogsfx]")
+TEST_CASE("GenShader: OGSFX Unique Names", "[genogsfx]")
 {
     mx::GenContext context(mx::OgsFxShaderGenerator::create());
 
     mx::FilePath searchPath = mx::FilePath::getCurrentPath() / mx::FilePath("libraries");
     context.registerSourceCodeSearchPath(searchPath);
 
-    GenShaderUtil::testUniqueNames(context, mx::HW::FX_STAGE);
+    GenShaderUtil::testUniqueNames(context, mx::Stage::EFFECT);
 }
 
 class OgsFxShaderGeneratorTester : public GlslShaderGeneratorTester
@@ -99,6 +94,11 @@ public:
     {
         _shaderGenerator = mx::OgsFxShaderGenerator::create();
     }
+
+    void setTestStages() override
+    {
+        _testStages.push_back(mx::Stage::EFFECT);
+    }
 };
 
 static void generateOGSFXCode()
@@ -113,7 +113,7 @@ static void generateOGSFXCode()
     tester.testGeneration(genOptions);
 }
 
-TEST_CASE("OGSFX Shader Generation", "[genogsfx]")
+TEST_CASE("GenShader: OGSFX Shader Generation", "[genogsfx]")
 {
     generateOGSFXCode();
 }

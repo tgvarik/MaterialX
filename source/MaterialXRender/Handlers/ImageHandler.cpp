@@ -10,19 +10,27 @@
 
 namespace MaterialX
 {
-std::string ImageLoader::BMP_EXTENSION = "bmp";
-std::string ImageLoader::EXR_EXTENSION = "exr";
-std::string ImageLoader::GIF_EXTENSION = "gif";
-std::string ImageLoader::HDR_EXTENSION = "hdr";
-std::string ImageLoader::JPG_EXTENSION = "jpg";
-std::string ImageLoader::JPEG_EXTENSION = "jpeg";
-std::string ImageLoader::PIC_EXTENSION = "pic";
-std::string ImageLoader::PNG_EXTENSION = "png";
-std::string ImageLoader::PSD_EXTENSION = "psd";
-std::string ImageLoader::TGA_EXTENSION = "tga";
-std::string ImageLoader::TIF_EXTENSION = "tif";
-std::string ImageLoader::TIFF_EXTENSION = "tiff";
-std::string ImageLoader::TXT_EXTENSION = "txt";
+string ImageDesc::BASETYPE_UINT8 = "UINT8";
+string ImageDesc::BASETYPE_HALF = "HALF";
+string ImageDesc::BASETYPE_FLOAT = "FLOAT";
+
+string ImageDesc::IMAGETYPE_2D = "IMAGE2D";
+
+string ImageLoader::BMP_EXTENSION = "bmp";
+string ImageLoader::EXR_EXTENSION = "exr";
+string ImageLoader::GIF_EXTENSION = "gif";
+string ImageLoader::HDR_EXTENSION = "hdr";
+string ImageLoader::JPG_EXTENSION = "jpg";
+string ImageLoader::JPEG_EXTENSION = "jpeg";
+string ImageLoader::PIC_EXTENSION = "pic";
+string ImageLoader::PNG_EXTENSION = "png";
+string ImageLoader::PSD_EXTENSION = "psd";
+string ImageLoader::TGA_EXTENSION = "tga";
+string ImageLoader::TIF_EXTENSION = "tif";
+string ImageLoader::TIFF_EXTENSION = "tiff";
+string ImageLoader::TX_EXTENSION = "tx";
+string ImageLoader::TXT_EXTENSION = "txt";
+string ImageLoader::TXR_EXTENSION = "txr";
 
 ImageHandler::ImageHandler(ImageLoaderPtr imageLoader)
 {
@@ -31,15 +39,29 @@ ImageHandler::ImageHandler(ImageLoaderPtr imageLoader)
 
 void ImageHandler::addLoader(ImageLoaderPtr loader)
 {
-    const StringVec& extensions = loader->supportedExtensions();
-    for (auto extension : extensions)
+    if (loader)
     {
-        _imageLoaders.insert(std::pair<std::string, ImageLoaderPtr>(extension, loader));
+        const StringSet& extensions = loader->supportedExtensions();
+        for (auto extension : extensions)
+        {
+            _imageLoaders.insert(std::pair<string, ImageLoaderPtr>(extension, loader));
+        }
+    }
+}
+
+void ImageHandler::supportedExtensions(StringSet& extensions)
+{
+    extensions.clear();
+    for (auto loader : _imageLoaders)
+    {
+        const StringSet& loaderExtensions = loader.second->supportedExtensions();
+        extensions.insert(loaderExtensions.begin(), loaderExtensions.end());
     }
 }
 
 bool ImageHandler::saveImage(const FilePath& filePath,
-                            const ImageDesc &imageDesc)
+                             const ImageDesc &imageDesc,
+                             bool verticalFlip)
 {
     FilePath foundFilePath = findFile(filePath);
 
@@ -50,7 +72,7 @@ bool ImageHandler::saveImage(const FilePath& filePath,
     ImageLoaderMap::iterator last = --range.first;
     for (auto it = first; it != last; --it)
     {
-        bool saved = it->second->saveImage(foundFilePath, imageDesc);
+        bool saved = it->second->saveImage(foundFilePath, imageDesc, verticalFlip);
         if (saved)
         {
             return true;
@@ -59,7 +81,7 @@ bool ImageHandler::saveImage(const FilePath& filePath,
     return false;
 }
 
-bool ImageHandler::acquireImage(const FilePath& filePath, ImageDesc &imageDesc, bool generateMipMaps, const std::array<float, 4>* /*fallbackColor*/)
+bool ImageHandler::acquireImage(const FilePath& filePath, ImageDesc &imageDesc, bool /*generateMipMaps*/, const Color4* /*fallbackColor*/)
 {
     FilePath foundFilePath = findFile(filePath);
 
@@ -70,7 +92,7 @@ bool ImageHandler::acquireImage(const FilePath& filePath, ImageDesc &imageDesc, 
     ImageLoaderMap::iterator last= --range.first;
     for (auto it = first; it != last; --it)
     {
-        bool acquired = it->second->acquireImage(foundFilePath, imageDesc, generateMipMaps);
+        bool acquired = it->second->acquireImage(foundFilePath, imageDesc, getRestrictions());
         if (acquired)
         {
             return true;
@@ -79,7 +101,7 @@ bool ImageHandler::acquireImage(const FilePath& filePath, ImageDesc &imageDesc, 
     return false;
 }
 
-bool ImageHandler::createColorImage(const std::array<float,4>& color,
+bool ImageHandler::createColorImage(const Color4& color,
                                     ImageDesc& desc)
 {
     // Create a solid color image
@@ -100,7 +122,12 @@ bool ImageHandler::createColorImage(const std::array<float,4>& color,
     return true;
 }
 
-void ImageHandler::cacheImage(const std::string& identifier, const ImageDesc& desc)
+bool ImageHandler::bindImage(const string& /*identifier*/, const ImageSamplingProperties& /*samplingProperties*/)
+{
+    return false;
+}
+
+void ImageHandler::cacheImage(const string& identifier, const ImageDesc& desc)
 {
     if (!_imageCache.count(identifier))
     {
@@ -108,12 +135,12 @@ void ImageHandler::cacheImage(const std::string& identifier, const ImageDesc& de
     }
 }
 
-void ImageHandler::uncacheImage(const std::string& identifier)
+void ImageHandler::uncacheImage(const string& identifier)
 {
     _imageCache.erase(identifier);
 }
 
-const ImageDesc* ImageHandler::getCachedImage(const std::string& identifier)
+const ImageDesc* ImageHandler::getCachedImage(const string& identifier)
 {
     if (_imageCache.count(identifier))
     {
@@ -132,5 +159,13 @@ FilePath ImageHandler::findFile(const FilePath& filePath)
     return _searchPath.find(filePath);
 }
 
+void ImageHandler::deleteImage(ImageDesc& imageDesc)
+{
+    if (imageDesc.resourceBuffer)
+    {
+        free(imageDesc.resourceBuffer);
+        imageDesc.resourceBuffer = nullptr;
+    }
+}
 
 }
