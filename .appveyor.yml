@@ -52,6 +52,7 @@ deploy:
     # Deploy on main working branch
     - provider: GitHub
       prerelease: true
+      artifacts: MaterialX_ADSK
       on:
         VS_PLATFORM: Windows
         branch: adsk_contrib/shaderx
