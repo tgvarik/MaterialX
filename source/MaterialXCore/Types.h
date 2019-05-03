@@ -583,7 +583,7 @@ class Matrix44 : public MatrixN<Matrix44, float, 4>
                 m30, m31, m32, m33};
     }
 
-    Vector4 multiply(const Vector4& rhs) const
+    Vector4 operator*(const Vector4& rhs) const
     {
         return Vector4(
           _arr[0][0] * rhs[0] + _arr[0][1] * rhs[1] + _arr[0][2] * rhs[2] + _arr[0][3] * rhs[3],
