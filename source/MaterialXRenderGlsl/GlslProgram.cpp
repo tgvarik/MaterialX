@@ -27,7 +27,7 @@ static string IRRADIANCE_ENV_UNIFORM_NAME("u_envIrradiance");
 /// Sampling constants
 static string UADDRESS_MODE_POST_FIX("_uaddressmode");
 static string VADDRESS_MODE_POST_FIX("_vaddressmode");
-static string FILTER_TYPE_POST_FIX("_filterType");
+static string FILTER_TYPE_POST_FIX("_filtertype");
 static string DEFAULT_COLOR_POST_FIX("_default");
 
 //
@@ -104,7 +104,7 @@ void GlslProgram::deleteProgram()
     if (_programId > UNDEFINED_OPENGL_RESOURCE_ID)
     {
         glUseProgram(0);
-        glDeleteObjectARB(_programId);
+        glDeleteProgram(_programId);
         _programId = UNDEFINED_OPENGL_RESOURCE_ID;
     }
 
@@ -266,9 +266,9 @@ bool GlslProgram::bind()
 }
 
 void GlslProgram::bindInputs(ViewHandlerPtr viewHandler,
-                            GeometryHandler& geometryHandler,
+                            GeometryHandlerPtr geometryHandler,
                             ImageHandlerPtr imageHandler,
-                            HwLightHandlerPtr lightHandler)
+                            LightHandlerPtr lightHandler)
 {
     // Bind the program to use
     if (!bind())
@@ -287,7 +287,7 @@ void GlslProgram::bindInputs(ViewHandlerPtr viewHandler,
 
     // Bind based on inputs found
     bindViewInformation(viewHandler);
-    for (auto mesh : geometryHandler.getMeshes())
+    for (auto mesh : geometryHandler->getMeshes())
     {
         bindStreams(mesh);
     }
@@ -368,6 +368,7 @@ void GlslProgram::bindAttribute(const MaterialX::GlslProgram::InputMap& inputs, 
         }
 
         glEnableVertexAttribArray(location);
+        _enabledStreamLocations.insert(location);
         glVertexAttribPointer(location, stride, GL_FLOAT, GL_FALSE, 0, 0);
     }
 }
@@ -392,6 +393,7 @@ void GlslProgram::bindPartition(MeshPartitionPtr partition)
 
 void GlslProgram::bindStreams(MeshPtr mesh)
 {
+    _enabledStreamLocations.clear(); 
     ShaderValidationErrorList errors;
     const std::string errorType("GLSL geometry bind error.");
 
@@ -488,13 +490,14 @@ void GlslProgram::unbindGeometry()
 {
     // Cleanup attribute bindings
     //
-    glBindVertexArray(0);
     int numberAttributes = 0;
     glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &numberAttributes);
-    for (int i = 0; i < numberAttributes; i++)
+    for (int i : _enabledStreamLocations)
     {
         glDisableVertexAttribArray(i);
     }
+    _enabledStreamLocations.clear();
+    glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, MaterialX::GlslProgram::UNDEFINED_OPENGL_RESOURCE_ID);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, MaterialX::GlslProgram::UNDEFINED_OPENGL_RESOURCE_ID);
 
@@ -526,20 +529,21 @@ void GlslProgram::unbindTextures(ImageHandlerPtr imageHandler)
 
 bool GlslProgram::bindTexture(unsigned int uniformType, int uniformLocation, const FilePath& filePath,
                               ImageHandlerPtr imageHandler, bool generateMipMaps,
-                              const ImageSamplingProperties& samplingProperties)
+                              const ImageSamplingProperties& samplingProperties, ImageDesc& desc)
 {
     bool textureBound = false;
     if (uniformLocation >= 0 &&
         uniformType >= GL_SAMPLER_1D && uniformType <= GL_SAMPLER_CUBE)
     {
-        ImageDesc imageDesc;
-        bool haveImage = imageHandler->acquireImage(filePath, imageDesc, generateMipMaps, &(samplingProperties.defaultColor));
-
-        if (haveImage)
+        if (imageHandler->acquireImage(filePath, desc, generateMipMaps, &(samplingProperties.defaultColor)))
         {
             // Map location to a texture unit
-            glUniform1i(uniformLocation, imageDesc.resourceId);
-            textureBound = imageHandler->bindImage(filePath, samplingProperties);
+            int textureLocation = imageHandler->getBoundTextureLocation(desc.resourceId);
+            if (textureLocation >= 0) 
+            {
+               glUniform1i(uniformLocation, textureLocation);
+               textureBound = imageHandler->bindImage(filePath, samplingProperties);
+            }
         }
         checkErrors();
     }
@@ -620,7 +624,8 @@ void GlslProgram::bindTextures(ImageHandlerPtr imageHandler)
                 samplingProperties.defaultColor[1] = defaultColor[1];
                 samplingProperties.defaultColor[2] = defaultColor[2];
                 samplingProperties.defaultColor[3] = defaultColor[3];
-                bindTexture(uniformType, uniformLocation, fileName, imageHandler, true, samplingProperties);
+                ImageDesc desc;
+                bindTexture(uniformType, uniformLocation, fileName, imageHandler, true, samplingProperties, desc);
             }
         }
     }
@@ -628,7 +633,7 @@ void GlslProgram::bindTextures(ImageHandlerPtr imageHandler)
 }
 
 
-void GlslProgram::bindLighting(HwLightHandlerPtr lightHandler, ImageHandlerPtr imageHandler)
+void GlslProgram::bindLighting(LightHandlerPtr lightHandler, ImageHandlerPtr imageHandler)
 {
     if (!lightHandler)
     {
@@ -677,32 +682,42 @@ void GlslProgram::bindLighting(HwLightHandlerPtr lightHandler, ImageHandlerPtr i
     }
 
     // Bind any IBL textures specified
-    MaterialX::StringMap iblList;
-    iblList[RADIANCE_ENV_UNIFORM_NAME] = lightHandler->getLightEnvRadiancePath();
-    iblList[IRRADIANCE_ENV_UNIFORM_NAME] = lightHandler->getLightEnvIrradiancePath();
+    MaterialX::StringMap iblList = {
+        { RADIANCE_ENV_UNIFORM_NAME, lightHandler->getLightEnvRadiancePath() },
+        { IRRADIANCE_ENV_UNIFORM_NAME, lightHandler->getLightEnvIrradiancePath() }
+    };
+
     for (auto ibl : iblList)
     {
-        MaterialX::GlslProgram::InputPtr inputPtr = nullptr;
-        auto it = uniformList.find(ibl.first);
-        if (it != uniformList.end())
-        {
-            inputPtr = it->second;
-        }
+        auto iblUniform = uniformList.find(ibl.first);
+        GlslProgram::InputPtr inputPtr = iblUniform != uniformList.end() ? iblUniform->second : nullptr;
         if (inputPtr)
         {
             GLenum uniformType = inputPtr->gltype;
             GLint uniformLocation = inputPtr->location;
-            std::string fileName(inputPtr->value ? inputPtr->value->getValueString() : "");
+            string fileName(inputPtr->value ? inputPtr->value->getValueString() : EMPTY_STRING);
             if (fileName.empty())
             {
                 fileName = ibl.second;
             }
-            ImageSamplingProperties desc;
-            bindTexture(uniformType, uniformLocation, fileName, imageHandler, true, desc);
+
+            ImageDesc desc;
+            if (bindTexture(uniformType, uniformLocation, fileName, imageHandler, true, ImageSamplingProperties(), desc))
+            {
+                if (iblUniform->first == RADIANCE_ENV_UNIFORM_NAME)
+                {
+                    // This is our radiance texture so set the mip count.
+                    auto mipsUniform = uniformList.find("u_envRadianceMips");
+                    if (mipsUniform != uniformList.end() && mipsUniform->second->location >= 0)
+                    {
+                        glUniform1i(mipsUniform->second->location, desc.mipCount);
+                    }
+                }
+            }
         }
     }
 
-    const std::vector<NodePtr> lightList = lightHandler->getLightSources();
+    const vector<NodePtr> lightList = lightHandler->getLightSources();
     const std::unordered_map<string, unsigned int>& ids = lightHandler->getLightIdentifierMap();
 
     size_t index = 0;
@@ -855,7 +870,9 @@ void GlslProgram::bindViewInformation(ViewHandlerPtr viewHandler)
 
     GLint location = MaterialX::GlslProgram::UNDEFINED_OPENGL_PROGRAM_LOCATION;
 
-    // Set view direction and position
+    //
+    // View direction and position
+    //
     const MaterialX::GlslProgram::InputMap& uniformList = getUniformsList();
     auto Input = uniformList.find("u_viewPosition");
     if (Input != uniformList.end())
@@ -863,8 +880,7 @@ void GlslProgram::bindViewInformation(ViewHandlerPtr viewHandler)
         location = Input->second->location;
         if (location >= 0)
         {
-            Vector3& viewPosition = viewHandler->viewPosition();
-            glUniform3f(location, viewPosition[0], viewPosition[1], viewPosition[2]);
+            glUniform3fv(location, 1, viewHandler->viewPosition().data());
         }
     }
     Input = uniformList.find("u_viewDirection");
@@ -873,128 +889,181 @@ void GlslProgram::bindViewInformation(ViewHandlerPtr viewHandler)
         location = Input->second->location;
         if (location >= 0)
         {
-            Vector3& viewDirection = viewHandler->viewDirection();
-            glUniform3f(location, viewDirection[0], viewDirection[1], viewDirection[2]);
+            glUniform3fv(location, 1, viewHandler->viewDirection().data());
         }
     }
 
-    Matrix44& worldMatrix = viewHandler->worldMatrix();
-    Matrix44& viewMatrix = viewHandler->viewMatrix();
-    Matrix44& projectionMatrix = viewHandler->projectionMatrix();
-    Matrix44 viewProjection = viewMatrix * projectionMatrix;
-
-    // Set world related matrices. World matrix is identity so
-    // bind the same matrix to all locations
     //
-    StringVec worldMatrixVariables =
-    {
-        "u_worldMatrix",
-        "u_worldInverseMatrix",
-        "u_worldTransposeMatrix",
-        "u_worldInverseTransposeMatrix"
-    };
-    for (auto worldMatrixVariable : worldMatrixVariables)
-    {
-        Input = uniformList.find(worldMatrixVariable);
-        if (Input != uniformList.end())
-        {
-            location = Input->second->location;
-            if (location >= 0)
-            {
-                glUniformMatrix4fv(location, 1, false, &(worldMatrix[0][0]));
-            }
-        }
-    }
-
-    // Bind projection matrices
+    // World matrix variants
     //
-    StringVec projectionMatrixVariables =
+    Matrix44& world = viewHandler->worldMatrix();
+    Matrix44 invWorld = world.getInverse();
+    Matrix44 invTransWorld = invWorld.getTranspose();
+
+    // World matrix 
+    Input = uniformList.find("u_worldMatrix");
+    if (Input != uniformList.end())
     {
-        "u_projectionMatrix",
-        "u_projectionTransposeMatrix",
-        "u_projectionInverseMatrix",
-        "u_projectionInverseTransposeMatrix",
-    };
-    Matrix44 inverseProjection;
-    bool computedInverse = false;
-    for (auto projectionMatrixVariable : projectionMatrixVariables)
-    {
-        Input = uniformList.find(projectionMatrixVariable);
-        if (Input != uniformList.end())
+        location = Input->second->location;
+        if (location >= 0)
         {
-            location = Input->second->location;
-            if (location >= 0)
-            {
-                bool transpose = (projectionMatrixVariable.find("Transpose") != std::string::npos);
-                if (projectionMatrixVariable.find("Inverse") != std::string::npos)
-                {
-                    if (!computedInverse)
-                    {
-                        inverseProjection = projectionMatrix.getInverse();
-                    }
-                    glUniformMatrix4fv(location, 1, transpose, &(inverseProjection[0][0]));
-                }
-                else
-                {
-                    glUniformMatrix4fv(location, 1, transpose, &(projectionMatrix[0][0]));
-                }
-            }
+            glUniformMatrix4fv(location, 1, false, world.getTranspose().data());
+        }
+    }
+    // World transpose matrix
+    Input = uniformList.find("u_worldTransposeMatrix");
+    if (Input != uniformList.end())
+    {
+        location = Input->second->location;
+        if (location >= 0)
+        {
+            glUniformMatrix4fv(location, 1, false, world.data());
+        }
+    }
+    // World inverse matrix
+    Input = uniformList.find("u_worldInverseMatrix");
+    if (Input != uniformList.end())
+    {
+        location = Input->second->location;
+        if (location >= 0)
+        {
+            glUniformMatrix4fv(location, 1, false, invWorld.getTranspose().data());
+        }
+    }
+    // World inverse transpose matrix
+    Input = uniformList.find("u_worldInverseTransposeMatrix");
+    if (Input != uniformList.end())
+    {
+        location = Input->second->location;
+        if (location >= 0)
+        {
+            glUniformMatrix4fv(location, 1, false, invTransWorld.getTranspose().data());
         }
     }
 
-    // Bind view related matrices
-    StringVec viewMatrixVariables =
+    //
+    // Projection matrix variants
+    //
+    Matrix44& proj = viewHandler->projectionMatrix();
+    // Projection matrix 
+    Input = uniformList.find("u_projectionMatrix");
+    if (Input != uniformList.end())
     {
-        "u_viewMatrix",
-        "u_viewTransposeMatrix",
-        "u_viewInverseMatrix",
-        "u_viewInverseTransposeMatrix",
-    };
-    Matrix44 inverseView;
-    computedInverse = false;
-    for (auto viewMatrixVariable : viewMatrixVariables)
-    {
-        Input = uniformList.find(viewMatrixVariable);
-        if (Input != uniformList.end())
+        location = Input->second->location;
+        if (location >= 0)
         {
-            location = Input->second->location;
-            if (location >= 0)
-            {
-                bool transpose = (viewMatrixVariable.find("Transpose") != std::string::npos);
-                if (viewMatrixVariable.find("Inverse") != std::string::npos)
-                {
-                    if (!computedInverse)
-                    {
-                        inverseView = viewMatrix.getInverse();
-                    }
-                    glUniformMatrix4fv(location, 1, transpose, &(inverseView[0][0]));
-                }
-                else
-                {
-                    glUniformMatrix4fv(location, 1, transpose, &(viewMatrix[0][0]));
-                }
-            }
+            glUniformMatrix4fv(location, 1, false, proj.getTranspose().data());
+        }
+    }
+    // Projection tranpose matrix
+    Input = uniformList.find("u_projectionInverseMatrix");
+    if (Input != uniformList.end())
+    {
+        location = Input->second->location;
+        if (location >= 0)
+        {
+            glUniformMatrix4fv(location, 1, false, proj.data());
+        }
+    }
+    // Projection inverse matrix
+    Matrix44 projInverse= proj.getInverse();
+    Input = uniformList.find("u_projectionInverseMatrix");
+    if (Input != uniformList.end())
+    {
+        location = Input->second->location;
+        if (location >= 0)
+        {
+            glUniformMatrix4fv(location, 1, false, projInverse.getTranspose().data());
+        }
+    }
+    // Projection inverse transpose matrix
+    Input = uniformList.find("u_projectionInverseTransposeMatrix");
+    if (Input != uniformList.end())
+    {
+        location = Input->second->location;
+        if (location >= 0)
+        {
+            glUniformMatrix4fv(location, 1, false, projInverse.data());
         }
     }
 
-    // Bind combined matrices
-    StringVec combinedMatrixVariables =
+
+    //
+    // View matrix variants
+    //
+    Matrix44& view = viewHandler->viewMatrix();
+
+    // View matrix
+    Input = uniformList.find("u_viewMatrix");
+    if (Input != uniformList.end())
     {
-        "u_viewProjectionMatrix",
-        "u_worldViewProjectionMatrix"
-    };
-    for (auto combinedMatrixVariable : combinedMatrixVariables)
-    {
-        Input = uniformList.find(combinedMatrixVariable);
-        if (Input != uniformList.end())
+        location = Input->second->location;
+        if (location >= 0)
         {
-            location = Input->second->location;
-            if (location >= 0)
-            {
-                glUniformMatrix4fv(location, 1, GL_FALSE, &(viewProjection[0][0]));
-            }
+            glUniformMatrix4fv(location, 1, false, view.getTranspose().data());
         }
     }
+    // View tranpose
+    Input = uniformList.find("u_viewTransposeMatrix");
+    if (Input != uniformList.end())
+    {
+        location = Input->second->location;
+        if (location >= 0)
+        {
+            glUniformMatrix4fv(location, 1, false, view.data());
+        }
+    }
+    // View inverse
+    Matrix44 viewInverse = view.getInverse();
+    Input = uniformList.find("u_viewInverseMatrix");
+    if (Input != uniformList.end())
+    {
+        location = Input->second->location;
+        if (location >= 0)
+        {
+            glUniformMatrix4fv(location, 1, false, viewInverse.getTranspose().data());
+        }
+    }
+    // View inverse transpose
+    Input = uniformList.find("u_viewInverseTransposeMatrix");
+    if (Input != uniformList.end())
+    {
+        location = Input->second->location;
+        if (location >= 0)
+        {
+            glUniformMatrix4fv(location, 1, false, viewInverse.data());
+        }
+    }
+    
+    //
+    // View projection matrix
+    //
+    Matrix44 viewProj = proj * view;
+    Input = uniformList.find("u_viewProjectionMatrix");
+    if (Input != uniformList.end())
+    {
+        location = Input->second->location;
+        if (location >= 0)
+        {
+            glUniformMatrix4fv(location, 1, false, viewProj.getTranspose().data());
+        }
+    }
+
+    //
+    // World view projection world
+    //
+    Matrix44 viewProjWorld = world * viewProj;
+    Input = uniformList.find("u_worldViewProjectionMatrix");
+    if (Input != uniformList.end())
+    {
+        location = Input->second->location;
+        if (location >= 0)
+        {
+            glUniformMatrix4fv(location, 1, false, viewProjWorld.getTranspose().data());
+        }
+    }
+
+    
 
     checkErrors();
 }

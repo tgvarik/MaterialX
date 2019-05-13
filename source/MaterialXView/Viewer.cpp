@@ -4,9 +4,9 @@
 #include <MaterialXGenShader/Shader.h>
 #include <MaterialXGenShader/Util.h>
 #include <MaterialXRender/Util.h>
-#include <MaterialXRender/Handlers/OiioImageLoader.h>
-#include <MaterialXRender/Handlers/StbImageLoader.h>
-#include <MaterialXRender/Handlers/TinyObjLoader.h>
+#include <MaterialXRender/OiioImageLoader.h>
+#include <MaterialXRender/StbImageLoader.h>
+#include <MaterialXRender/TinyObjLoader.h>
 
 #include <nanogui/button.h>
 #include <nanogui/combobox.h>
@@ -65,8 +65,7 @@ mx::DocumentPtr loadLibraries(const mx::StringVec& libraryFolders, const mx::Fil
     for (const std::string& libraryFolder : libraryFolders)
     {
         mx::FilePath path = searchPath.find(libraryFolder);
-        mx::StringVec filenames;
-        mx::getFilesInDirectory(path.asString(), filenames, "mtlx");
+        mx::FilePathVec filenames = path.getFilesInDirectory("mtlx");
 
         for (const std::string& filename : filenames)
         {
@@ -90,9 +89,10 @@ mx::DocumentPtr loadLibraries(const mx::StringVec& libraryFolders, const mx::Fil
 
 Viewer::Viewer(const mx::StringVec& libraryFolders,
                const mx::FileSearchPath& searchPath,
-               const std::string meshFilename,
-               const std::string materialFilename,
+               const std::string& meshFilename,
+               const std::string& materialFilename,
                const DocumentModifiers& modifiers,
+               mx::HwSpecularEnvironmentMethod specularEnvironmentMethod,
                int multiSampleCount) :
     ng::Screen(ng::Vector2i(1280, 960), "MaterialXView",
         true, false,
@@ -103,7 +103,7 @@ Viewer::Viewer(const mx::StringVec& libraryFolders,
     _zoom(1.0f),
     _viewAngle(45.0f),
     _nearDist(0.05f),
-    _farDist(100.0f),
+    _farDist(5000.0f),
     _modelZoom(1.0f),
     _translationActive(false),
     _translationStart(0, 0),
@@ -120,7 +120,9 @@ Viewer::Viewer(const mx::StringVec& libraryFolders,
     _mergeMaterials(false),
     _assignLooks(false),
     _outlineSelection(false),
+    _specularEnvironmentMethod(specularEnvironmentMethod),
     _envSamples(DEFAULT_ENV_SAMPLES),
+    _drawEnvironment(false),
     _captureFrame(false)
 {
     _window = new ng::Window(this, "Viewer Options");
@@ -158,7 +160,7 @@ Viewer::Viewer(const mx::StringVec& libraryFolders,
     });
 
     // Set default generator options.
-    _genContext.getOptions().hwSpecularEnvironmentMethod = mx::SPECULAR_ENVIRONMENT_FIS;
+    _genContext.getOptions().hwSpecularEnvironmentMethod = _specularEnvironmentMethod;
     _genContext.getOptions().targetColorSpaceOverride = "lin_rec709";
     _genContext.getOptions().fileTextureVerticalFlip = true;
 
@@ -186,17 +188,56 @@ Viewer::Viewer(const mx::StringVec& libraryFolders,
     }
 
     // Construct the appropriate image handler for this build.
+    // Most recently added loader will be checked first.
+    mx::ImageLoaderPtr stdImageLoader = mx::StbImageLoader::create();
+    _imageHandler = mx::GLTextureHandler::create(stdImageLoader);
 #if MATERIALX_BUILD_OIIO
-    mx::ImageLoaderPtr imageLoader = mx::OiioImageLoader::create();
-#else
-    mx::ImageLoaderPtr imageLoader = mx::StbImageLoader::create();
+    mx::ImageLoaderPtr oiioImageLoader = mx::OiioImageLoader::create();
+    _imageHandler->addLoader(oiioImageLoader);
 #endif
-    _imageHandler = mx::GLTextureHandler::create(imageLoader);
 
     mx::TinyObjLoaderPtr loader = mx::TinyObjLoader::create();
-    _geometryHandler.addLoader(loader);
-    _geometryHandler.loadGeometry(_searchPath.find(meshFilename));
+    _geometryHandler = mx::GeometryHandler::create();
+    _geometryHandler->addLoader(loader);
+    _geometryHandler->loadGeometry(_searchPath.find(meshFilename));
     updateGeometrySelections();
+
+    _envGeometryHandler = mx::GeometryHandler::create();
+    _envGeometryHandler->addLoader(loader);
+    mx::FilePath envSphere("resources/Geometry/sphere.obj");
+    _envGeometryHandler->loadGeometry(_searchPath.find(envSphere));
+    const mx::MeshList& meshes = _envGeometryHandler->getMeshes();
+    if (!meshes.empty())
+    {
+        // Invert u
+        mx::MeshPtr mesh = meshes[0];
+        mx::MeshStreamPtr stream = mesh->getStream(mx::MeshStream::TEXCOORD_ATTRIBUTE, 0);
+        mx::MeshFloatBuffer &buffer = stream->getData();
+        size_t stride = stream->getStride();
+        for (size_t i = 0; i < buffer.size() / stride; i++)
+        {
+            float val = (1.0f - buffer[i*stride]);
+            buffer[i*stride] = (val < 0.0f) ? (val + 1.0f) : ((val > 1.0f) ? val -= 1.0f : val);
+        }
+        // Set up world matrix for drawing
+        const float scaleFactor = 300.0f;
+        const float rotationRadians = PI / 2.0f; // 90 degree rotation
+        _envMatrix = mx::Matrix44::createScale(mx::Vector3(scaleFactor)) * mx::Matrix44::createRotationY(rotationRadians);
+
+        const std::string envShaderName("__ENV_SHADER_NAME__");
+        _envMaterial = Material::create();
+        try
+        {
+            const std::string addressMode("clamp");
+            _envMaterial->generateImageShader(_genContext, _stdLib, envShaderName, _envRadiancePath, addressMode);
+            _envMaterial->bindMesh(_envGeometryHandler->getMeshes()[0]);
+        }
+        catch (std::exception& e)
+        {
+            _envMaterial = nullptr;
+            new ng::MessageDialog(this, ng::MessageDialog::Type::Warning, "Failed to generate environment shader", e.what());
+        }
+    }
 
     // Initialize camera
     initCamera();
@@ -210,7 +251,7 @@ Viewer::Viewer(const mx::StringVec& libraryFolders,
         Material::loadDocument(_doc, _searchPath.find(_materialFilename), _stdLib, _modifiers, _materials);
         updateMaterialSelections();
         setMaterialSelection(0);
-        if (_materials.size())
+        if (!_materials.empty())
         {
             assignMaterial(_materials[0]);
         }
@@ -259,10 +300,7 @@ void Viewer::setupLights(mx::DocumentPtr doc, const std::string& envRadiancePath
     }
 
     // Create a new light handler
-    _lightHandler = mx::HwLightHandler::create();
-
-    // Clear context light user data.
-    _genContext.popUserData(mx::HW::USER_DATA_LIGHT_SHADERS);
+    _lightHandler = mx::LightHandler::create();
 
     try 
     {
@@ -320,6 +358,9 @@ void Viewer::initializeDocument(mx::DocumentPtr libraries)
     }
     _genContext.getShaderGenerator().setColorManagementSystem(cms);
 
+    // Clear user data if previously used.
+    _genContext.clearUserData();
+
     // Add lighting 
     setupLights(_doc, _envRadiancePath, _envIrradiancePath);
 
@@ -331,7 +372,7 @@ void Viewer::initializeDocument(mx::DocumentPtr libraries)
 
 void Viewer::assignMaterial(MaterialPtr material, mx::MeshPartitionPtr geometry)
 {
-    const mx::MeshList& meshes = _geometryHandler.getMeshes();
+    const mx::MeshList& meshes = _geometryHandler->getMeshes();
     if (meshes.empty())
     {
         return;
@@ -367,10 +408,10 @@ void Viewer::createLoadMeshInterface(Widget* parent, const std::string label)
         std::string filename = ng::file_dialog({ { "obj", "Wavefront OBJ" } }, false);
         if (!filename.empty())
         {
-            _geometryHandler.clearGeometry();
-            if (_geometryHandler.loadGeometry(filename))
+            _geometryHandler->clearGeometry();
+            if (_geometryHandler->loadGeometry(filename))
             {
-                const mx::MeshList& meshes = _geometryHandler.getMeshes();
+                const mx::MeshList& meshes = _geometryHandler->getMeshes();
                 if (!meshes.empty())
                 {
                     if (_splitByUdims)
@@ -409,6 +450,50 @@ void Viewer::createLoadMaterialsInterface(Widget* parent, const std::string labe
         std::string filename = ng::file_dialog({ { "mtlx", "MaterialX" } }, false);
         if (!filename.empty())
         {
+            // Try loading new materials first
+            {
+                _materialFilename = filename;
+                try
+                {
+                    if (!_mergeMaterials)
+                    {
+                        initializeDocument(_stdLib);
+                    }
+                    size_t newRenderables = Material::loadDocument(_doc, _searchPath.find(_materialFilename), _stdLib, _modifiers, _materials);
+                    if (newRenderables > 0)
+                    {
+                        updateMaterialSelections();
+
+                        // Clear cached implementations in case a nodedef 
+                        // or nodegraph has changed on disc.
+                        _genContext.clearNodeImplementations();
+
+                        mx::MeshPtr mesh = _geometryHandler->getMeshes()[0];
+                        for (auto m : _materials)
+                        {
+                            m->generateShader(_genContext);
+                            if (mesh)
+                            {
+                                m->bindMesh(mesh);
+                            }
+                        }
+                        if (!_mergeMaterials)
+                        {
+                            setMaterialSelection(0);
+                            if (!_materials.empty())
+                            {
+                                assignMaterial(_materials[0]);
+                            }
+                        }
+                    }
+                }
+                catch (std::exception& e)
+                {
+                    new ng::MessageDialog(this, ng::MessageDialog::Type::Warning, "Material Assignment Error", e.what());
+                }
+            }
+
+            // Then try loading looks
             if (_assignLooks)
             {
                 try
@@ -444,10 +529,6 @@ void Viewer::createLoadMaterialsInterface(Widget* parent, const std::string labe
                                         break;
                                     }
                                 }
-                                if (assignedMaterial)
-                                {
-                                    break;
-                                }
                             }
                             if (!assignedMaterial)
                             {
@@ -458,7 +539,7 @@ void Viewer::createLoadMaterialsInterface(Widget* parent, const std::string labe
                             // material to it.
                             mx::StringVec geomList;
                             std::string geom = assignment->getGeom();
-                            if (geom.size())
+                            if (!geom.empty())
                             {
                                 geomList.push_back(geom);
                             }
@@ -493,43 +574,6 @@ void Viewer::createLoadMaterialsInterface(Widget* parent, const std::string labe
                     new ng::MessageDialog(this, ng::MessageDialog::Type::Warning, "Look Assignment Error", e.what());
                 }
             }
-            else
-            {
-                _materialFilename = filename;
-                try
-                {
-                    if (!_mergeMaterials)
-                    {
-                        initializeDocument(_stdLib);
-                    }
-                    size_t newRenderables = Material::loadDocument(_doc, _searchPath.find(_materialFilename), _stdLib, _modifiers, _materials);
-                    if (newRenderables > 0)
-                    {
-                        updateMaterialSelections();
-                        for (auto m : _materials)
-                        {
-                            m->generateShader(_genContext);
-                            mx::MeshPtr mesh = _geometryHandler.getMeshes()[0];
-                            if (mesh)
-                            {
-                                m->bindMesh(mesh);
-                            }
-                        }
-                        if (!_mergeMaterials)
-                        {
-                            setMaterialSelection(0);
-                            if (!_materials.empty())
-                            {
-                                assignMaterial(_materials[0]);
-                            }
-                        }
-                    }
-                }
-                catch (std::exception& e)
-                {
-                    new ng::MessageDialog(this, ng::MessageDialog::Type::Warning, "Material Assignment Error", e.what());
-                }
-            }
         }
         mProcessEvents = true;
     });
@@ -554,7 +598,7 @@ void Viewer::createAdvancedSettings(Widget* parent)
 
     new ng::Label(advancedPopup, "Material Options");
 
-    ng::CheckBox* mergeMaterialsBox = new ng::CheckBox(advancedPopup, "Merge Materials");
+    ng::CheckBox* mergeMaterialsBox = new ng::CheckBox(advancedPopup, "Add Materials");
     mergeMaterialsBox->setChecked(_mergeMaterials);
     mergeMaterialsBox->setCallback([this](bool enable)
     {
@@ -593,33 +637,43 @@ void Viewer::createAdvancedSettings(Widget* parent)
         _outlineSelection = enable;
     });
 
-    Widget* sampleGroup = new Widget(advancedPopup);
-    sampleGroup->setLayout(new ng::BoxLayout(ng::Orientation::Horizontal));
-    new ng::Label(sampleGroup, "Environment Samples:");
-    mx::StringVec sampleOptions;
-    for (int i = MIN_ENV_SAMPLES; i <= MAX_ENV_SAMPLES; i *= 4)
+    ng::CheckBox* drawEnvironmentBox = new ng::CheckBox(advancedPopup, "Render Environment");
+    drawEnvironmentBox->setChecked(_drawEnvironment);
+    drawEnvironmentBox->setCallback([this](bool enable)
     {
-        mProcessEvents = false;
-        sampleOptions.push_back(std::to_string(i));
-        mProcessEvents = true;
-    }
-    ng::ComboBox* sampleBox = new ng::ComboBox(sampleGroup, sampleOptions);
-    sampleBox->setChevronIcon(-1);
-    sampleBox->setSelectedIndex((int) std::log2(DEFAULT_ENV_SAMPLES / MIN_ENV_SAMPLES) / 2);
-    sampleBox->setCallback([this](int index)
-    {
-        _envSamples = MIN_ENV_SAMPLES * (int) std::pow(4, index);
+        _drawEnvironment = enable;
     });
+
+    if (_specularEnvironmentMethod == mx::SPECULAR_ENVIRONMENT_FIS)
+    {
+        Widget* sampleGroup = new Widget(advancedPopup);
+        sampleGroup->setLayout(new ng::BoxLayout(ng::Orientation::Horizontal));
+        new ng::Label(sampleGroup, "Environment Samples:");
+        mx::StringVec sampleOptions;
+        for (int i = MIN_ENV_SAMPLES; i <= MAX_ENV_SAMPLES; i *= 4)
+        {
+            mProcessEvents = false;
+            sampleOptions.push_back(std::to_string(i));
+            mProcessEvents = true;
+        }
+        ng::ComboBox* sampleBox = new ng::ComboBox(sampleGroup, sampleOptions);
+        sampleBox->setChevronIcon(-1);
+        sampleBox->setSelectedIndex((int)std::log2(DEFAULT_ENV_SAMPLES / MIN_ENV_SAMPLES) / 2);
+        sampleBox->setCallback([this](int index)
+        {
+            _envSamples = MIN_ENV_SAMPLES * (int)std::pow(4, index);
+        });
+    }
 }
 
 void Viewer::updateGeometrySelections()
 {
     _geometryList.clear();
-    if (_geometryHandler.getMeshes().empty())
+    if (_geometryHandler->getMeshes().empty())
     {
         return;
     }
-    mx::MeshPtr mesh = _geometryHandler.getMeshes()[0];
+    mx::MeshPtr mesh = _geometryHandler->getMeshes()[0];
 
     if (_wireMaterial)
     {
@@ -633,15 +687,14 @@ void Viewer::updateGeometrySelections()
     }
 
     std::vector<std::string> items;
-    for (size_t i = 0; i < _geometryList.size(); i++)
+    for (const mx::MeshPartitionPtr& part : _geometryList)
     {
-        std::string geomName = _geometryList[i]->getIdentifier();
+        std::string geomName = part->getIdentifier();
         mx::StringVec geomSplit = mx::splitString(geomName, ":");
         if (!geomSplit.empty() && !geomSplit[geomSplit.size() - 1].empty())
         {
             geomName = geomSplit[geomSplit.size() - 1];
         }
-
         items.push_back(geomName);
     }
     _geometryListBox->setItems(items);
@@ -719,7 +772,42 @@ MaterialPtr Viewer::setMaterialSelection(size_t index)
     return nullptr;
 }
 
-void Viewer::saveActiveMaterialSource()
+void Viewer::reloadDocument()
+{
+    try
+    {
+        if (!_materialFilename.isEmpty())
+        {
+            initializeDocument(_stdLib);
+            size_t newRenderables = Material::loadDocument(_doc, _searchPath.find(_materialFilename), _stdLib, _modifiers, _materials);
+            if (newRenderables)
+            {
+                updateMaterialSelections();
+                setMaterialSelection(0);
+                if (!_materials.empty())
+                {
+                    assignMaterial(_materials[0]);
+                }
+            }
+        }
+    }
+    catch (std::exception& e)
+    {
+        new ng::MessageDialog(this, ng::MessageDialog::Type::Warning, "Failed to load document", e.what());
+    }
+    try
+    {
+        updateMaterialSelections();
+        setMaterialSelection(_selectedMaterial);
+        updatePropertyEditor();
+    }
+    catch (std::exception& e)
+    {
+        new ng::MessageDialog(this, ng::MessageDialog::Type::Warning, "Shader Generation Error", e.what());
+    }
+}
+
+void Viewer::saveShaderSource()
 {
     try
     {
@@ -732,9 +820,10 @@ void Viewer::saveActiveMaterialSource()
             {
                 std::string vertexShader = shader->getSourceCode(mx::Stage::VERTEX);
                 std::string pixelShader = shader->getSourceCode(mx::Stage::PIXEL);
-                std::string baseName = elem->getName();
-                writeTextFile(vertexShader, _searchPath[0] / (baseName + "_vs.glsl"));
-                writeTextFile(pixelShader, _searchPath[0] / (baseName + "_ps.glsl"));
+                std::string baseName = _searchPath[0] / elem->getName();
+                writeTextFile(vertexShader,  baseName + "_vs.glsl");
+                writeTextFile(pixelShader, baseName + "_ps.glsl");
+                new ng::MessageDialog(this, ng::MessageDialog::Type::Information, "Saved GLSL source: ", baseName);
             }
         }
     }
@@ -744,7 +833,7 @@ void Viewer::saveActiveMaterialSource()
     }
 }
 
-void Viewer::loadActiveMaterialSource()
+void Viewer::loadShaderSource()
 {
     try
     {
@@ -752,14 +841,16 @@ void Viewer::loadActiveMaterialSource()
         mx::TypedElementPtr elem = material ? material->getElement() : nullptr;
         if (elem)
         {
-            std::string baseName = elem->getName();
-            std::string vertexShaderFile = _searchPath[0] / (baseName + "_vs.glsl");
-            std::string pixelShaderFile = _searchPath[0] / (baseName + "_ps.glsl");
+            std::string elementName = elem->getName();
+            std::string baseName = _searchPath[0] / elementName;
+            std::string vertexShaderFile = baseName + "_vs.glsl";
+            std::string pixelShaderFile = baseName + "_ps.glsl";
             // Ignore transparency for now as we can't know from the source code 
             // if the shader is transparent or not.
             if (material->loadSource(vertexShaderFile, pixelShaderFile, baseName, false))
             {
                 assignMaterial(material, _geometryList[_selectedGeom]);
+                new ng::MessageDialog(this, ng::MessageDialog::Type::Information, "Loaded GLSL source: ", baseName);
             }
         }
     }
@@ -769,6 +860,46 @@ void Viewer::loadActiveMaterialSource()
     }
 }
 
+void Viewer::saveDotFiles()
+{
+    try
+    {
+        MaterialPtr material = getSelectedMaterial();
+        mx::TypedElementPtr elem = material ? material->getElement() : nullptr;
+        if (elem)
+        {
+            mx::ShaderRefPtr shaderRef = elem->asA<mx::ShaderRef>();
+            if (shaderRef)
+            {
+                for (mx::BindInputPtr bindInput : shaderRef->getBindInputs())
+                {
+                    mx::OutputPtr output = bindInput->getConnectedOutput();
+                    mx::ConstNodeGraphPtr nodeGraph = output ? output->getAncestorOfType<mx::NodeGraph>() : nullptr;
+                    if (nodeGraph)
+                    {
+                        std::string dot = nodeGraph->asStringDot();
+                        std::string baseName = _searchPath[0] / nodeGraph->getName();
+                        writeTextFile(dot, baseName + ".dot");
+                    }
+                }
+
+                mx::NodeDefPtr nodeDef = shaderRef ? shaderRef->getNodeDef() : nullptr;
+                mx::InterfaceElementPtr implement = nodeDef ? nodeDef->getImplementation() : nullptr;
+                mx::NodeGraphPtr nodeGraph = implement ? implement->asA<mx::NodeGraph>() : nullptr;
+                if (nodeGraph)
+                {
+                    std::string dot = nodeGraph->asStringDot();
+                    std::string baseName = _searchPath[0] / nodeDef->getName();
+                    writeTextFile(dot, baseName + ".dot");
+                }
+            }
+        }
+    }
+    catch (std::exception& e)
+    {
+        new ng::MessageDialog(this, ng::MessageDialog::Type::Warning, "Cannot save dot file for material", e.what());
+    }
+}
 
 bool Viewer::keyboardEvent(int key, int scancode, int action, int modifiers)
 {
@@ -777,6 +908,36 @@ bool Viewer::keyboardEvent(int key, int scancode, int action, int modifiers)
         return true;
     }
 
+    // Reload the current document from file.
+    if (key == GLFW_KEY_R && action == GLFW_PRESS)
+    {
+        reloadDocument();
+        return true;
+    }
+
+    // Save the current shader source to file.
+    if (key == GLFW_KEY_S && action == GLFW_PRESS)
+    {
+        saveShaderSource();
+        return true;
+    }
+
+    // Load shader source from file.  Editing the source files before loading
+    // provides a way to debug and experiment with shader source code.
+    if (key == GLFW_KEY_L && action == GLFW_PRESS)
+    {
+        loadShaderSource();
+        return true;
+    }
+
+    // Save each node graph in the current material as a dot file.
+    if (key == GLFW_KEY_D && action == GLFW_PRESS)
+    {
+        saveDotFiles();
+        return true;
+    }
+
+    // Capture the current frame and save to file.
     if (key == GLFW_KEY_F && action == GLFW_PRESS)
     {
         mx::StringSet extensions;
@@ -791,7 +952,7 @@ bool Viewer::keyboardEvent(int key, int scancode, int action, int modifiers)
             std::string fileName = ng::file_dialog(filetypes, true);
             if (!fileName.empty())
             {
-                std::string fileExtension = (fileName.substr(fileName.find_last_of(".") + 1));
+                std::string fileExtension = mx::FilePath(fileName).getExtension();
                 if (extensions.count(fileExtension) == 0)
                 {
                     fileName += "." + *extensions.begin();
@@ -800,57 +961,6 @@ bool Viewer::keyboardEvent(int key, int scancode, int action, int modifiers)
                 _captureFrame = true;
             }
         }
-    }
-    if (key == GLFW_KEY_R && action == GLFW_PRESS)
-    {
-        try
-        {
-            if (!_materialFilename.isEmpty())
-            {
-                initializeDocument(_stdLib);
-                size_t newRenderables = Material::loadDocument(_doc, _searchPath.find(_materialFilename), _stdLib, _modifiers, _materials);
-                if (newRenderables)
-                {
-                    updateMaterialSelections();
-                    setMaterialSelection(0);
-                    if (_materials.size())
-                    {
-                        assignMaterial(_materials[0]);
-                    }
-                }
-            }
-        }
-        catch (std::exception& e)
-        {
-            new ng::MessageDialog(this, ng::MessageDialog::Type::Warning, "Failed to load document", e.what());
-        }
-        try
-        {
-            updateMaterialSelections();
-            setMaterialSelection(_selectedMaterial);
-            updatePropertyEditor();
-        }
-        catch (std::exception& e)
-        {
-            new ng::MessageDialog(this, ng::MessageDialog::Type::Warning, "Shader Generation Error", e.what());
-        }
-        return true;
-    }
-
-    // Save active material if any
-    if (key == GLFW_KEY_S && action == GLFW_PRESS)
-    {
-        saveActiveMaterialSource();
-        return true;
-    }
-
-    // Load a material previously saved to file.
-    // Editing the source files before loading gives a way to debug
-    // and experiment with shader source code.
-    if (key == GLFW_KEY_L && action == GLFW_PRESS)
-    {
-        loadActiveMaterialSource();
-        return true;
     }
 
     // Allow left and right keys to cycle through the renderable elements
@@ -899,6 +1009,24 @@ void Viewer::drawContents()
     glDisable(GL_CULL_FACE);
     glEnable(GL_FRAMEBUFFER_SRGB);
 
+    if (_drawEnvironment && _envMaterial)
+    {
+        GLShaderPtr envShader = _envMaterial->getShader();
+        auto meshes = _envGeometryHandler->getMeshes();
+        auto envPart = !meshes.empty() ? meshes[0]->getPartition(0) : nullptr;
+        if (envShader && envPart)
+        {
+            glEnable(GL_CULL_FACE);
+            glCullFace(GL_FRONT);
+            envShader->bind();
+            _envMaterial->bindViewInformation(_envMatrix, view, proj);
+            _envMaterial->bindImages(_imageHandler, _searchPath, _envMaterial->getUdim());
+            _envMaterial->drawPartition(envPart);
+            glDisable(GL_CULL_FACE);
+            glCullFace(GL_BACK);
+        }
+    }
+
     mx::TypedElementPtr lastBoundShader;
     for (auto assignment : _materialAssignments)
     {
@@ -906,7 +1034,7 @@ void Viewer::drawContents()
         MaterialPtr material = assignment.second;
         mx::TypedElementPtr shader = material->getElement();
 
-        material->bindShader(_genContext);
+        material->bindShader();
         if (material->hasTransparency())
         {
             glEnable(GL_BLEND);
@@ -917,7 +1045,8 @@ void Viewer::drawContents()
             glDisable(GL_BLEND);
         }
         material->bindViewInformation(world, view, proj);
-        material->bindLights(_lightHandler, _imageHandler, _searchPath, _envSamples, _directLighting, _indirectLighting);
+        material->bindLights(_lightHandler, _imageHandler, _searchPath, _directLighting, _indirectLighting,
+                             _specularEnvironmentMethod, _envSamples);
         material->bindImages(_imageHandler, _searchPath, material->getUdim());
         material->drawPartition(geom);
     }
@@ -941,7 +1070,7 @@ void Viewer::drawContents()
 
     if (_captureFrame)
     {
-        bool saved = false;
+        _captureFrame = false;
 
         glFlush();
         glPixelStorei(GL_PACK_ALIGNMENT, 1);
@@ -951,22 +1080,18 @@ void Viewer::drawContents()
         int w = mSize.x() * static_cast<int>(mPixelRatio);
         int h = mSize.y() * static_cast<int>(mPixelRatio);
         size_t bufferSize = w * h * 3;
-        uint8_t* buffer = new uint8_t[bufferSize];
-        if (buffer)
-        {
-            glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, buffer);
+        std::vector<uint8_t> buffer(bufferSize);
+        glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, buffer.data());
 
-            mx::ImageDesc desc;
-            desc.width = w;
-            desc.height = h;
-            desc.channelCount = 3;
-            desc.resourceBuffer = buffer;
-            desc.baseType = mx::ImageDesc::BASETYPE_UINT8;
-            saved = _imageHandler->saveImage(_captureFrameFileName, desc, true);
-            delete[] buffer;
-        }
-        _captureFrame = false;
+        mx::ImageDesc desc;
+        desc.width = w;
+        desc.height = h;
+        desc.channelCount = 3;
+        desc.resourceBuffer = buffer.data();
+        desc.baseType = mx::ImageDesc::BASETYPE_UINT8;
 
+        bool saved = _imageHandler->saveImage(_captureFrameFileName, desc, true);
+        desc.resourceBuffer = nullptr;
         if (!saved)
         {
             new ng::MessageDialog(this, ng::MessageDialog::Type::Information,
@@ -1005,7 +1130,7 @@ bool Viewer::mouseMotionEvent(const ng::Vector2i& p,
         computeCameraMatrices(world, view, proj);
         mx::Matrix44 worldView = view * world;
 
-        mx::MeshPtr mesh = _geometryHandler.getMeshes()[0];
+        mx::MeshPtr mesh = _geometryHandler->getMeshes()[0];
         mx::Vector3 boxMin = mesh->getMinimumBounds();
         mx::Vector3 boxMax = mesh->getMaximumBounds();
         mx::Vector3 sphereCenter = (boxMax + boxMin) / 2.0;
@@ -1068,11 +1193,11 @@ void Viewer::initCamera()
     _arcball = ng::Arcball();
     _arcball.setSize(mSize);
 
-    if (_geometryHandler.getMeshes().empty())
+    if (_geometryHandler->getMeshes().empty())
     {
         return;
     }
-    mx::MeshPtr mesh = _geometryHandler.getMeshes()[0];
+    mx::MeshPtr mesh = _geometryHandler->getMeshes()[0];
 
     mx::Vector3 boxMin = mesh->getMinimumBounds();
     mx::Vector3 boxMax = mesh->getMaximumBounds();

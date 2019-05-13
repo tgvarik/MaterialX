@@ -1,7 +1,7 @@
 #ifndef MATERIALXVIEW_MATERIAL_H
 #define MATERIALXVIEW_MATERIAL_H
 
-#include <MaterialXRender/Handlers/GeometryHandler.h>
+#include <MaterialXRender/GeometryHandler.h>
 
 #include <MaterialXCore/Document.h>
 #include <MaterialXFormat/XmlIo.h>
@@ -9,7 +9,7 @@
 
 #include <MaterialXGenGlsl/GlslShaderGenerator.h>
 #include <MaterialXGenShader/HwShaderGenerator.h>
-#include <MaterialXRender/Handlers/HwLightHandler.h>
+#include <MaterialXRender/LightHandler.h>
 #include <MaterialXRenderGlsl/GLTextureHandler.h>
 
 #include <nanogui/common.h>
@@ -34,7 +34,10 @@ class DocumentModifiers
 class Material
 {
   public:
-    Material() {}
+    Material() :
+        _hasTransparency(false)
+    {
+    }
     ~Material() { }
 
     static MaterialPtr create()
@@ -74,7 +77,10 @@ class Material
     }
 
     /// Load shader source from file.
-    bool loadSource(const mx::FilePath& vertexStage, const mx::FilePath& pixelStage, const std::string& shaderName, bool hasTransparency);
+    bool loadSource(const mx::FilePath& vertexShaderFile,
+                    const mx::FilePath& pixelShaderFile,
+                    const std::string& shaderName,
+                    bool hasTransparency);
 
     /// Generate a shader from the given inputs.
     bool generateShader(mx::GenContext& context);
@@ -84,6 +90,13 @@ class Material
                                 mx::DocumentPtr stdLib,
                                 const std::string& shaderName,
                                 const mx::Color3& color);
+
+    /// Generate an unshaded image shader
+    bool generateImageShader(mx::GenContext& context,
+                             mx::DocumentPtr stdLib,
+                             const std::string& shaderName,
+                             const mx::FilePath& imagePath,
+                             const std::string& addressMode);
 
     /// Return the underlying OpenGL shader.
     GLShaderPtr getShader() const
@@ -98,21 +111,23 @@ class Material
     }
     
     /// Bind shader
-    void bindShader(mx::GenContext& context);
+    void bindShader();
 
     /// Bind viewing information for this material.
     void bindViewInformation(const mx::Matrix44& world, const mx::Matrix44& view, const mx::Matrix44& proj);
 
     /// Bind all images for this material.
-    void bindImages(mx::GLTextureHandlerPtr imageHandler, const mx::FileSearchPath& imagePath, const std::string& udim);
+    void bindImages(mx::GLTextureHandlerPtr imageHandler,
+                    const mx::FileSearchPath& searchPath,
+                    const std::string& udim);
 
     /// Bind a single image.
     bool bindImage(std::string filename, const std::string& uniformName, mx::GLTextureHandlerPtr imageHandler,
-                   mx::ImageDesc& desc, const std::string& udim = mx::EMPTY_STRING, mx::Color4* fallbackColor = nullptr);
+                   mx::ImageDesc& desc, const mx::ImageSamplingProperties& samplingProperties, const std::string& udim = mx::EMPTY_STRING, mx::Color4* fallbackColor = nullptr);
 
     /// Bind lights to shader.
-    void bindLights(mx::HwLightHandlerPtr lightHandler, mx::GLTextureHandlerPtr imageHandler, const mx::FileSearchPath& imagePath, 
-                    int envSamples, bool directLighting, bool indirectLighting);
+    void bindLights(mx::LightHandlerPtr lightHandler, mx::GLTextureHandlerPtr imageHandler, const mx::FileSearchPath& imagePath, 
+                    bool directLighting, bool indirectLighting, mx::HwSpecularEnvironmentMethod specularEnvironmentMethod, int envSamples);
 
     /// Bind the given mesh to this material.
     void bindMesh(mx::MeshPtr mesh) const;
@@ -131,12 +146,14 @@ class Material
 
   protected:
     void bindUniform(const std::string& name, mx::ConstValuePtr value);
+    void updateUniformsList();
 
     GLShaderPtr _glShader;
     mx::ShaderPtr _hwShader;
     mx::TypedElementPtr _elem;
     std::string _udim;
     bool _hasTransparency;
+    mx::StringSet _uniformNames;
 };
 
 #endif // MATERIALXVIEW_MATERIAL_H

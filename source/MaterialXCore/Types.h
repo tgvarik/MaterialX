@@ -545,6 +545,16 @@ class Matrix33 : public MatrixN<Matrix33, float, 3>
                 m20, m21, m22};
     }
 
+    /// @name Point/Vector/Normal Transformations
+    /// @{
+
+    Vector3 transform(const Vector3& rhs) const;
+    Vector2 transformPoint(const Vector2& rhs) const;
+    Vector2 transformVector(const Vector2& rhs) const;
+    Vector3 transformNormal(const Vector3& rhs) const;
+    Vector2 transformNormal(const Vector2& rhs) const;
+
+    /// @}
     /// @name 2D Transformations
     /// @{
 
@@ -557,7 +567,7 @@ class Matrix33 : public MatrixN<Matrix33, float, 3>
     // Create a rotation matrix.
     // @param angle Angle in radians
     static Matrix33 createRotation(float angle);
-    
+
     /// @}
 
   public:
@@ -583,6 +593,16 @@ class Matrix44 : public MatrixN<Matrix44, float, 4>
                 m30, m31, m32, m33};
     }
 
+    /// @name Point/Vector/Normal Transformations
+    /// @{
+
+    Vector4 transform(const Vector4& rhs) const;
+    Vector3 transformPoint(const Vector3& rhs) const;
+    Vector3 transformVector(const Vector3& rhs) const;
+    Vector4 transformNormal(const Vector4& rhs) const;
+    Vector3 transformNormal(const Vector3& rhs) const;
+
+    /// @}
     /// @name 3D Transformations
     /// @{
 

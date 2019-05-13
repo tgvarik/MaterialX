@@ -13,49 +13,23 @@ namespace mx = MaterialX;
 
 TEST_CASE("Load content", "[xmlio]")
 {
-    std::string libraryFilenames[] =
-    {
-        "stdlib_defs.mtlx",
-        "stdlib_ng.mtlx",
-        "stdlib_osl_impl.mtlx"
-    };
-    std::string exampleFilenames[] =
-    {
-        "CustomNode.mtlx",
-        "Looks.mtlx",
-        "MaterialBasic.mtlx",
-        "MultiOutput.mtlx",
-        "NodeGraphs.mtlx",
-        "PaintMaterials.mtlx",
-        "PostShaderComposite.mtlx",
-        "PreShaderComposite.mtlx"
-    };
-
-    std::string searchPath = "libraries/stdlib" +
+    mx::FilePath libraryPath("libraries/stdlib");
+    mx::FilePath examplesPath("resources/Materials/Examples/Syntax");
+    std::string searchPath = libraryPath.asString() +
                              mx::PATH_LIST_SEPARATOR +
-                             "libraries/stdlib/osl" +
-                             mx::PATH_LIST_SEPARATOR +
-                             "resources/Materials/Examples";
+                             examplesPath.asString();
 
     // Read the standard library.
     std::vector<mx::DocumentPtr> libs;
-    for (std::string filename : libraryFilenames)
+    for (std::string filename : libraryPath.getFilesInDirectory(mx::MTLX_EXTENSION))
     {
         mx::DocumentPtr lib = mx::createDocument();
         mx::readFromXmlFile(lib, filename, searchPath);
-        std::string message;
-        bool docValid = lib->validate(&message);
-        if (!docValid)
-        {
-            WARN("[" + filename + "] " + message);
-        }
-        REQUIRE(docValid);
         libs.push_back(lib);
     }
 
     // Read and validate each example document.
-    bool firstExample = true;
-    for (std::string filename : exampleFilenames)
+    for (std::string filename : examplesPath.getFilesInDirectory(mx::MTLX_EXTENSION))
     {
         mx::DocumentPtr doc = mx::createDocument();
         mx::readFromXmlFile(doc, filename, searchPath);
@@ -120,7 +94,7 @@ TEST_CASE("Load content", "[xmlio]")
         // Flatten subgraph references.
         for (mx::NodeGraphPtr nodeGraph : doc->getNodeGraphs())
         {
-            if (!firstExample && nodeGraph->getActiveSourceUri() != doc->getSourceUri())
+            if (nodeGraph->getActiveSourceUri() != doc->getSourceUri())
             {
                 continue;
             }
@@ -128,12 +102,11 @@ TEST_CASE("Load content", "[xmlio]")
             REQUIRE(nodeGraph->validate());
         }
 
-        // Verify that all referenced types and nodes are declared, and that
-        // referenced node declarations are implemented.
+        // Verify that all referenced types and nodes are declared.
         bool referencesValid = true;
         for (mx::ElementPtr elem : doc->traverseTree())
         {
-            if (!firstExample && elem->getActiveSourceUri() != doc->getSourceUri())
+            if (elem->getActiveSourceUri() != doc->getSourceUri())
             {
                 continue;
             }
@@ -147,7 +120,6 @@ TEST_CASE("Load content", "[xmlio]")
                     referencesValid = false;
                 }
             }
-
             mx::NodePtr node = elem->asA<mx::Node>();
             if (node)
             {
@@ -156,16 +128,9 @@ TEST_CASE("Load content", "[xmlio]")
                     WARN("[" + node->getActiveSourceUri() + "] Node " + node->getName() + " has no matching NodeDef");
                     referencesValid = false;
                 }
-                if (!node->getImplementation())
-                {
-                    WARN("[" + node->getActiveSourceUri() + "] Node " + node->getName() + " has no matching Implementation");
-                    referencesValid = false;
-                }
             }
         }
         REQUIRE(referencesValid);
-
-        firstExample = false;
     }
 
     // Read the same document twice with duplicate elements skipped.
@@ -219,4 +184,10 @@ TEST_CASE("Load content", "[xmlio]")
     // Read a non-existent document.
     mx::DocumentPtr nonExistentDoc = mx::createDocument();
     REQUIRE_THROWS_AS(mx::readFromXmlFile(nonExistentDoc, "NonExistent.mtlx"), mx::ExceptionFileMissing&);
+
+    // Read in include file without specifying search to the parent document
+    mx::DocumentPtr parentDoc = mx::createDocument();
+    mx::readFromXmlFile(parentDoc,
+        "resources/Materials/TestSuite/libraries/metal/brass_wire_mesh.mtlx", searchPath);
+    REQUIRE(nullptr != parentDoc->getNodeDef("ND_TestMetal"));
 }

@@ -15,9 +15,10 @@ int main(int argc, char* const argv[])
     mx::StringVec libraryFolders = { "libraries/stdlib", "libraries/pbrlib", "libraries/stdlib/genglsl", "libraries/pbrlib/genglsl", "libraries/bxdf" };
     mx::FileSearchPath searchPath;
     std::string meshFilename = "resources/Geometry/teapot.obj";
-    std::string materialFilename = "resources/Materials/TestSuite/pbrlib/materials/standard_surface_default.mtlx";
+    std::string materialFilename = "resources/Materials/Examples/StandardSurface/standard_surface_default.mtlx";
     DocumentModifiers modifiers;
     int multiSampleCount = 0;
+    mx::HwSpecularEnvironmentMethod specularEnvironmentMethod = mx::SPECULAR_ENVIRONMENT_FIS;
 
     for (size_t i = 0; i < tokens.size(); i++)
     {
@@ -55,6 +56,13 @@ int main(int argc, char* const argv[])
         {
             modifiers.filePrefixTerminator = nextToken;
         }
+        if (token == "--envMethod" && !nextToken.empty())
+        {
+            if (std::stoi(nextToken) == 1)
+            {
+                specularEnvironmentMethod = mx::SPECULAR_ENVIRONMENT_PREFILTER;
+            }
+        }
         if (token == "--msaa" && !nextToken.empty())
         {
             multiSampleCount = std::stoi(nextToken);
@@ -65,9 +73,9 @@ int main(int argc, char* const argv[])
     mx::FilePath currentPath(mx::FilePath::getCurrentPath());
     mx::FilePath parentCurrentPath(currentPath);
     parentCurrentPath.pop();
-    std::vector<mx::FilePath> libraryPaths = { 
-        mx::FilePath("libraries"), 
-        mx::FilePath("resources/Materials/Examples") 
+    std::vector<mx::FilePath> libraryPaths =
+    { 
+        mx::FilePath("libraries")
     };
     for (auto libraryPath : libraryPaths)
     {
@@ -96,6 +104,7 @@ int main(int argc, char* const argv[])
                                                 meshFilename,
                                                 materialFilename,
                                                 modifiers,
+                                                specularEnvironmentMethod,
                                                 multiSampleCount);
             viewer->setVisible(true);
             ng::mainloop();

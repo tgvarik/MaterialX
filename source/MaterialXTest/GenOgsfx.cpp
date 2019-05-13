@@ -83,37 +83,46 @@ TEST_CASE("GenShader: OGSFX Unique Names", "[genogsfx]")
 
 class OgsFxShaderGeneratorTester : public GlslShaderGeneratorTester
 {
-public:
-    OgsFxShaderGeneratorTester(const mx::FilePath& testRootPath, const mx::FilePath& libSearchPath,
+  public:
+    OgsFxShaderGeneratorTester(const mx::FilePathVec& testRootPaths, const mx::FilePath& libSearchPath,
                                  const mx::FileSearchPath& srcSearchPath, const mx::FilePath& logFilePath) :
-            GlslShaderGeneratorTester(testRootPath, libSearchPath, srcSearchPath, logFilePath)
+            GlslShaderGeneratorTester(mx::OgsFxShaderGenerator::create(), testRootPaths, libSearchPath, srcSearchPath, logFilePath)
     {}
-
-    // Only the generator differs for now between OGSFX and GLSL testers
-    void createGenerator() override
-    {
-        _shaderGenerator = mx::OgsFxShaderGenerator::create();
-    }
 
     void setTestStages() override
     {
         _testStages.push_back(mx::Stage::EFFECT);
     }
+
+  protected:
+    void getImplementationWhiteList(mx::StringSet& whiteList) override
+    {
+        whiteList =
+        {
+            "ambientocclusion", "arrayappend", "backfacing", "screen", "curveadjust", "displacementshader",
+            "volumeshader", "IM_constant_", "IM_dot_", "IM_geomattrvalue", "IM_light_genglsl",
+            "IM_point_light_genglsl", "IM_spot_light_genglsl", "IM_directional_light_genglsl"
+        };
+    }
 };
 
-static void generateOGSFXCode()
+static void generateOgsFxCode()
 {
     const mx::FilePath testRootPath = mx::FilePath::getCurrentPath() / mx::FilePath("resources/Materials/TestSuite");
+    const mx::FilePath testRootPath2 = mx::FilePath::getCurrentPath() / mx::FilePath("resources/Materials/Examples/StandardSurface");
+    mx::FilePathVec testRootPaths;
+    testRootPaths.push_back(testRootPath);
     const mx::FilePath libSearchPath = mx::FilePath::getCurrentPath() / mx::FilePath("libraries");
     const mx::FileSearchPath srcSearchPath(libSearchPath.asString());
     const mx::FilePath logPath("genglsl_ogsfx_generate_test.txt");
-    OgsFxShaderGeneratorTester tester(testRootPath, libSearchPath, srcSearchPath, logPath);
+    OgsFxShaderGeneratorTester tester(testRootPaths, libSearchPath, srcSearchPath, logPath);
 
     const mx::GenOptions genOptions;
-    tester.testGeneration(genOptions);
+    mx::FilePath optionsFilePath = testRootPath / mx::FilePath("_options.mtlx");
+    tester.validate(genOptions, optionsFilePath);
 }
 
 TEST_CASE("GenShader: OGSFX Shader Generation", "[genogsfx]")
 {
-    generateOGSFXCode();
+    generateOgsFxCode();
 }

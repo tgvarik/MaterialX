@@ -3,7 +3,10 @@
 // All rights reserved.  See LICENSE.txt for license.
 //
 
-#include <MaterialXRender/HardwarePlatform.h>
+#if defined(_WIN32)
+#pragma warning( push )
+#pragma warning( disable: 4244)
+#endif
 
 #define TINYEXR_IMPLEMENTATION
 #include <cstdlib>
@@ -19,6 +22,10 @@
 #include <MaterialXContrib/External/tinyexr/tinyexr.h>
 #ifdef max_cache
 #define max max_cache
+#endif
+
+#if defined(_WIN32)
+#pragma warning( pop )
 #endif
 
 #include <MaterialXContrib/Handlers/TinyEXRImageLoader.h>
@@ -80,6 +87,10 @@ bool TinyEXRImageLoader::acquireImage(const FilePath& filePath,
         if (returnValue == 0)
         {
             imageDesc.resourceBuffer = buffer;
+            imageDesc.resourceBufferDeallocator = [](void* buffer)
+            {
+                free(buffer);
+            };
             imageDesc.width = iwidth;
             imageDesc.height = iheight;
             imageDesc.baseType = ImageDesc::BASETYPE_FLOAT;

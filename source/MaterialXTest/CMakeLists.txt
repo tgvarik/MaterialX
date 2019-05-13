@@ -4,13 +4,14 @@ include_directories(
 )
 
 file(GLOB_RECURSE materialx_source "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
-if(NOT MATERIALX_BUILD_RENDER)
-    list(REMOVE_ITEM materialx_source "${CMAKE_CURRENT_SOURCE_DIR}/Render.cpp")
+if(NOT MATERIALX_BUILD_GEN_ARNOLD)
+    list(REMOVE_ITEM materialx_source "${CMAKE_CURRENT_SOURCE_DIR}/GenArnold.cpp")
+    list(REMOVE_ITEM materialx_source "${CMAKE_CURRENT_SOURCE_DIR}/RenderArnold.cpp")
 endif()
 if(NOT MATERIALX_BUILD_GEN_OGSFX)
-    list(REMOVE_ITEM materialx_source "${CMAKE_CURRENT_SOURCE_DIR}/GenOgsfx.cpp")
+    list(REMOVE_ITEM materialx_source "${CMAKE_CURRENT_SOURCE_DIR}/GenOgsFx.cpp")
+    list(REMOVE_ITEM materialx_source "${CMAKE_CURRENT_SOURCE_DIR}/RenderOgsfx.cpp")
 endif()
-
 file(GLOB_RECURSE materialx_header "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
 file(GLOB_RECURSE catch_headers "${CMAKE_CURRENT_SOURCE_DIR}/Catch/*.hpp")
 
@@ -45,10 +46,10 @@ endif()
 
 add_custom_command(TARGET MaterialXTest POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory
-                   ${CMAKE_SOURCE_DIR}/libraries ${CMAKE_CURRENT_BINARY_DIR}/libraries)
+                   ${CMAKE_CURRENT_SOURCE_DIR}/../../libraries ${CMAKE_CURRENT_BINARY_DIR}/libraries)
 add_custom_command(TARGET MaterialXTest POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory
-                   ${CMAKE_SOURCE_DIR}/resources ${CMAKE_CURRENT_BINARY_DIR}/resources)
+                   ${CMAKE_CURRENT_SOURCE_DIR}/../../resources ${CMAKE_CURRENT_BINARY_DIR}/resources)
 
 set_target_properties(
     MaterialXTest PROPERTIES
@@ -64,23 +65,18 @@ set (LIBS
     MaterialXGenShader
     MaterialXGenOsl
     MaterialXGenGlsl
+    MaterialXRender
+    MaterialXRenderOsl
+    MaterialXRenderHw
+    MaterialXRenderGlsl
 )
 
 # Add language specific generators
+if (MATERIALX_BUILD_GEN_ARNOLD)
+    LIST(APPEND LIBS "MaterialXGenArnold")
+endif()
 if (MATERIALX_BUILD_GEN_OGSFX)
     LIST(APPEND LIBS "MaterialXGenOgsFx")
-endif()
-
-# Add render libraries
-if (MATERIALX_BUILD_RENDER)
-    LIST(APPEND LIBS "MaterialXRender")
-    if (MATERIALX_BUILD_RENDEROSL)
-        LIST(APPEND LIBS "MaterialXRenderOsl")
-    endif()
-    if (MATERIALX_BUILD_RENDERGLSL)
-        LIST(APPEND LIBS "MaterialXRenderHw")
-        LIST(APPEND LIBS "MaterialXRenderGlsl")
-    endif()
 endif()
 
 # Add contrib libraries
@@ -92,4 +88,3 @@ target_link_libraries(
     MaterialXTest ${LIBS}
     ${CMAKE_DL_LIBS}
 )
-

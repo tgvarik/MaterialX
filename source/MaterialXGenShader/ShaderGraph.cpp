@@ -32,7 +32,7 @@ void ShaderGraph::addInputSockets(const InterfaceElement& elem, GenContext& cont
     {
         if (!port->isA<Output>())
         {
-            const string& portValue = port->getValueString();
+            const string& portValue = port->getResolvedValueString();
             std::pair<const TypeDesc*, ValuePtr> enumResult;
             if (context.getShaderGenerator().remapEnumeration(*port, portValue, enumResult))
             {
@@ -117,8 +117,17 @@ void ShaderGraph::addUpstreamDependencies(const Element& root, ConstMaterialPtr 
         // Make connections
         //
 
-        // Find the output to connect to
-        OutputPtr nodeDefOutput = upstreamNode->getNodeDefOutput(edge);
+        // Find the output to connect to.
+        ElementPtr connectingElement = edge.getConnectingElement();
+        if (!connectingElement && downstreamElement->isA<Output>())
+        {
+            // Edge case for having an output downstream but no connecting
+            // element (input) reported upstream. In this case we set the
+            // output itself as connecting element, which handles finding
+            // the nodedef output in case of a multioutput node upstream.
+            connectingElement = downstreamElement->asA<Output>();
+        }
+        OutputPtr nodeDefOutput = connectingElement ? upstreamNode->getNodeDefOutput(connectingElement) : nullptr;
         ShaderOutput* output = nodeDefOutput ? newNode->getOutput(nodeDefOutput->getName()) : newNode->getOutput();
         if (!output)
         {
@@ -128,7 +137,6 @@ void ShaderGraph::addUpstreamDependencies(const Element& root, ConstMaterialPtr 
 
         // First check if this was a bind input connection
         // In this case we must have a root node as well
-        ElementPtr connectingElement = edge.getConnectingElement();
         if (rootNode && connectingElement && connectingElement->isA<BindInput>())
         {
             // Connect to the corresponding input on the root node
@@ -243,11 +251,14 @@ void ShaderGraph::addDefaultGeomNode(ShaderInput* input, const GeomPropDef& geom
 void ShaderGraph::addColorTransformNode(ShaderInput* input, const ColorSpaceTransform& transform, GenContext& context)
 {
     ColorManagementSystemPtr colorManagementSystem = context.getShaderGenerator().getColorManagementSystem();
-    if (!colorManagementSystem)
+    if (!colorManagementSystem || input->getConnection())
     {
+        // Ignore inputs with connections as they are not 
+        // allowed to have colorspaces specified.
         return;
     }
-    string colorTransformNodeName = input->getNode()->getName() + "_" + input->getName() + "_cm";
+
+    const string colorTransformNodeName = input->getNode()->getName() + "_" + input->getName() + "_cm";
     ShaderNodePtr colorTransformNodePtr = colorManagementSystem->createNode(this, transform, colorTransformNodeName, context);
 
     if (colorTransformNodePtr)
@@ -274,7 +285,8 @@ void ShaderGraph::addColorTransformNode(ShaderOutput* output, const ColorSpaceTr
     {
         return;
     }
-    string colorTransformNodeName = output->getNode()->getName() + "_" + output->getName() + "_cm";
+
+    const string colorTransformNodeName = output->getNode()->getName() + "_" + output->getName() + "_cm";
     ShaderNodePtr colorTransformNodePtr = colorManagementSystem->createNode(this, transform, colorTransformNodeName, context);
 
     if (colorTransformNodePtr)
@@ -348,25 +360,31 @@ ShaderGraphPtr ShaderGraph::create(const ShaderGraph* parent, const string& name
     {
         OutputPtr output = element->asA<Output>();
         ElementPtr outputParent = output->getParent();
-        InterfaceElementPtr interface = outputParent->asA<InterfaceElement>();
 
+        InterfaceElementPtr interface;
         if (outputParent->isA<NodeGraph>())
         {
-            NodeDefPtr nodeDef = outputParent->asA<NodeGraph>()->getNodeDef();
+            // A nodegraph output.
+            NodeGraphPtr nodeGraph = outputParent->asA<NodeGraph>();
+            NodeDefPtr nodeDef = nodeGraph->getNodeDef();
             if (nodeDef)
             {
                 interface = nodeDef;
             }
+            else
+            {
+                interface = nodeGraph;
+            }
         }
-
+        else if (outputParent->isA<Document>())
+        {
+            // A free floating output.
+            outputParent = output->getConnectedNode();
+            interface = outputParent->asA<InterfaceElement>();
+        }
         if (!interface)
         {
-            outputParent = output->getConnectedNode();
-            interface = outputParent ? outputParent->asA<InterfaceElement>() : nullptr;
-            if (!interface)
-            {
-                throw ExceptionShaderGenError("Given output '" + output->getName() + "' has no interface valid for shader generation");
-            }
+            throw ExceptionShaderGenError("Given output '" + output->getName() + "' has no interface valid for shader generation");
         }
 
         graph = std::make_shared<ShaderGraph>(parent, name, element->getDocument());
@@ -427,9 +445,10 @@ ShaderGraphPtr ShaderGraph::create(const ShaderGraph* parent, const string& name
             if (bindParam)
             {
                 // Copy value from binding
-                if (!bindParam->getValueString().empty())
+                ValuePtr bindParamValue = bindParam->getResolvedValue();
+                if (bindParamValue)
                 {
-                    inputSocket->setValue(bindParam->getValue());
+                    inputSocket->setValue(bindParamValue);
                 }
                 inputSocket->setPath(bindParam->getNamePath());
                 input->setPath(inputSocket->getPath());
@@ -454,9 +473,10 @@ ShaderGraphPtr ShaderGraph::create(const ShaderGraph* parent, const string& name
             if (bindInput)
             {
                 // Copy value from binding
-                if (!bindInput->getValueString().empty())
+                ValuePtr bindInputValue = bindInput->getResolvedValue();
+                if (bindInputValue)
                 {
-                    inputSocket->setValue(bindInput->getValue());
+                    inputSocket->setValue(bindInputValue);
                 }
                 inputSocket->setPath(bindInput->getNamePath());
                 input->setPath(inputSocket->getPath());
@@ -760,7 +780,7 @@ void ShaderGraph::disconnect(ShaderNode* node) const
     }
     for (ShaderOutput* output : node->getOutputs())
     {
-        output->breakConnection();
+        output->breakConnections();
     }
 }
 
@@ -1077,19 +1097,15 @@ void ShaderGraph::populateInputColorTransformMap(ColorManagementSystemPtr colorM
     const string& sourceColorSpace = input->getActiveColorSpace();
     if (shaderInput && !sourceColorSpace.empty())
     {
-        // Can skip inputs with connections as they are not legally allowed to have colorspaces specified.
-        if (!shaderInput->getConnection())
+        if(shaderInput->getType() == Type::COLOR3 || shaderInput->getType() == Type::COLOR4)
         {
-            if(shaderInput->getType() == Type::COLOR3 || shaderInput->getType() == Type::COLOR4)
+            // If we're converting between two identical color spaces than we have no work to do.
+            if (sourceColorSpace != targetColorSpace)
             {
-                // If we're converting between two identical color spaces than we have no work to do.
-                if (sourceColorSpace != targetColorSpace)
+                ColorSpaceTransform transform(sourceColorSpace, targetColorSpace, shaderInput->getType());
+                if (colorManagementSystem->supportsTransform(transform))
                 {
-                    ColorSpaceTransform transform(sourceColorSpace, targetColorSpace, shaderInput->getType());
-                    if (colorManagementSystem->supportsTransform(transform))
-                    {
-                        _inputColorTransformMap.emplace(shaderInput, transform);
-                    }
+                    _inputColorTransformMap.emplace(shaderInput, transform);
                 }
             }
         }

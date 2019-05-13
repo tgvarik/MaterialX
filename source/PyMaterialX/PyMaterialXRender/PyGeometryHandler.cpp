@@ -5,7 +5,7 @@
 
 #include <PyMaterialX/PyMaterialX.h>
 
-#include <MaterialXRender/Handlers/GeometryHandler.h>
+#include <MaterialXRender/GeometryHandler.h>
 
 namespace py = pybind11;
 namespace mx = MaterialX;
@@ -39,11 +39,11 @@ void bindPyGeometryHandler(py::module& mod)
 
     py::class_<mx::GeometryHandler, mx::GeometryHandlerPtr>(mod, "GeometryHandler")
         .def(py::init<>())
+        .def_static("create", &mx::GeometryHandler::create)
         .def("addLoader", &mx::GeometryHandler::addLoader)
-        .def("clearGeometry", static_cast<void (mx::GeometryHandler::*)()>(&mx::GeometryHandler::clearGeometry))
+        .def("clearGeometry", &mx::GeometryHandler::clearGeometry)
         .def("hasGeometry", &mx::GeometryHandler::hasGeometry)
         .def("getGeometry", &mx::GeometryHandler::getGeometry)
-        .def("clearGeometry", static_cast<void (mx::GeometryHandler::*)(const std::string&)>(&mx::GeometryHandler::clearGeometry))
         .def("loadGeometry", &mx::GeometryHandler::loadGeometry)
         .def("getMeshes", &mx::GeometryHandler::getMeshes)
         .def("getMinimumBounds", &mx::GeometryHandler::getMinimumBounds)
