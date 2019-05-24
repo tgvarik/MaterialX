@@ -71,9 +71,10 @@ void elementFromXml(const xml_node& xmlNode, ElementPtr elem, const XmlReadOptio
 }
 
 void createOGSProperty(xml_node& propertiesNode, xml_node& valuesNode,
-            const std::string &name, 
-            const std::string &type, 
-            const std::string &value,
+            const std::string& name, 
+            const std::string& type, 
+            const std::string& value,
+            const std::string& semantic,
             StringMap& typeMap)
 {
     // Special case filename
@@ -93,8 +94,11 @@ void createOGSProperty(xml_node& propertiesNode, xml_node& valuesNode,
 
         xml_node prop = propertiesNode.append_child(ogsType.c_str());
         prop.append_attribute("name") = name.c_str();
-        //prop.append_attribute("semantic") = "";
-        //prop.append_attribute("flags") = "";
+        if (!semantic.empty())
+        {
+            prop.append_attribute("semantic") = semantic.c_str();
+            prop.append_attribute("flags") = "varyingInputParam";
+        }
 
         xml_node val = valuesNode.append_child(ogsType.c_str());
         val.append_attribute("name") = name.c_str();
@@ -104,9 +108,9 @@ void createOGSProperty(xml_node& propertiesNode, xml_node& valuesNode,
 
 // Creates output children on "outputs" node
 void createOGSOutput(xml_node& outputsNode, 
-    const std::string &name,
-    const std::string &type,
-    const std::string &/*value*/,
+    const std::string& name,
+    const std::string& type,
+    const std::string& /*value*/,
     StringMap& typeMap)
 {
     if (!typeMap.count(type))
@@ -427,19 +431,35 @@ void createOGSWrapper(NodePtr elem, StringMap& languageMap, std::ostream& stream
 
     // Scan inputs and parameters and create "properties" and 
     // "values" children from the nodeDef
+    string semantic;
     xml_node xmlProperties = xmlRoot.append_child(OGS_PROPERTIES.c_str());
     xml_node xmlValues = xmlRoot.append_child(OGS_VALUES.c_str());
     for (auto input : nodeDef->getInputs())
     {
         string value = input->getValue() ? input->getValue()->getValueString() : "";
+
+        GeomPropDefPtr geomprop = input->getDefaultGeomProp();
+        if (geomprop)
+        {
+            string geomNodeDefName = "ND_" + geomprop->getGeomProp() + "_" + input->getType();
+            NodeDefPtr geomNodeDef = elem->getDocument()->getNodeDef(geomNodeDefName);
+            if (geomNodeDef)
+            {
+                string geompropString = geomNodeDef->getAttribute("node");
+                if (geompropString == "texcoord")
+                {
+                    semantic = "mayaUvCoordSemantic";
+                }
+            }
+        }
         createOGSProperty(xmlProperties, xmlValues,
-            input->getName(), input->getType(), value, typeMap);
+            input->getName(), input->getType(), value, semantic, typeMap);
     }
     for (auto input : nodeDef->getParameters())
     {
         string value = input->getValue() ? input->getValue()->getValueString() : "";
         createOGSProperty(xmlProperties, xmlValues,
-            input->getName(), input->getType(), value, typeMap);
+            input->getName(), input->getType(), value, "", typeMap);
     }
 
     // Scan outputs and create "outputs"
