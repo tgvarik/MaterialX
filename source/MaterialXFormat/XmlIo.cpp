@@ -76,12 +76,8 @@ void createOGSProperty(xml_node& propertiesNode, xml_node& valuesNode,
             const std::string &value,
             StringMap& typeMap)
 {
-    if (!typeMap.count(type))
-        return;
-
-    string ogsType = typeMap[type];
     // Special case filename
-    if (ogsType == "filename")
+    if (type == "filename")
     {
         xml_node txt = propertiesNode.append_child("texture2");
         txt.append_attribute("name") = name.c_str();
@@ -91,14 +87,18 @@ void createOGSProperty(xml_node& propertiesNode, xml_node& valuesNode,
     // Q: How to handle geometry streams?
     else
     { 
+        string ogsType = typeMap[type];
+        if (!typeMap.count(type))
+            return;
+
         xml_node prop = propertiesNode.append_child(ogsType.c_str());
         prop.append_attribute("name") = name.c_str();
         //prop.append_attribute("semantic") = "";
         //prop.append_attribute("flags") = "";
 
         xml_node val = valuesNode.append_child(ogsType.c_str());
-        prop.append_attribute("name") = name.c_str();
-        prop.append_attribute("value") = value.c_str();
+        val.append_attribute("name") = name.c_str();
+        val.append_attribute("value") = value.c_str();
     }
 }
 
@@ -446,8 +446,9 @@ void createOGSWrapper(NodePtr elem, StringMap& languageMap, std::ostream& stream
     xml_node xmlOutputs = xmlRoot.append_child("outputs");
     for (auto output : elem->getActiveOutputs())
     {
+        string value = output->getValue() ? output->getValue()->getValueString() : "";
         createOGSOutput(xmlOutputs,
-            output->getName(), output->getType(), output->getValue()->getValueString(), typeMap);
+            output->getName(), output->getType(), value, typeMap);
     }
     //std::ostream stream;
     //xmlDoc.save(stream, "  ");
