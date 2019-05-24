@@ -431,13 +431,15 @@ void createOGSWrapper(NodePtr elem, StringMap& languageMap, std::ostream& stream
     xml_node xmlValues = xmlRoot.append_child(OGS_VALUES.c_str());
     for (auto input : nodeDef->getInputs())
     {
+        string value = input->getValue() ? input->getValue()->getValueString() : "";
         createOGSProperty(xmlProperties, xmlValues,
-            input->getName(), input->getType(), input->getValue()->getValueString(), typeMap);
+            input->getName(), input->getType(), value, typeMap);
     }
     for (auto input : nodeDef->getParameters())
     {
+        string value = input->getValue() ? input->getValue()->getValueString() : "";
         createOGSProperty(xmlProperties, xmlValues,
-            input->getName(), input->getType(), input->getValue()->getValueString(), typeMap);
+            input->getName(), input->getType(), value, typeMap);
     }
 
     // Scan outputs and create "outputs"
