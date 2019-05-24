@@ -158,6 +158,8 @@ string writeToXmlString(DocumentPtr doc, const XmlWriteOptions* writeOptions = n
 /// @param filename The filename of the XInclude reference to be added.
 void prependXInclude(DocumentPtr doc, const string& filename);
 
+void createOGSWrapper(NodePtr elem, StringMap& languageMap, std::ostream& stream);
+
 /// @}
 
 } // namespace MaterialX

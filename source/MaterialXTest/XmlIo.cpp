@@ -9,6 +9,8 @@
 #include <MaterialXFormat/File.h>
 #include <MaterialXFormat/XmlIo.h>
 
+#include <fstream> 
+
 namespace mx = MaterialX;
 
 TEST_CASE("Load content", "[xmlio]")
@@ -166,7 +168,20 @@ TEST_CASE("Load content", "[xmlio]")
     writeOptions.writeXIncludeEnable = false;
     writeOptions.elementPredicate = skipImages;
     std::string xmlString = mx::writeToXmlString(doc, &writeOptions);
-        
+     
+    std::string ogsFN = "ogsDump.xml";
+    std::ofstream ogsStream(ogsFN);
+    mx::StringMap blah;
+    for (mx::ElementPtr elem : doc->traverseTree())
+    {
+        if (elem->isA<mx::Node>("image"))
+        {
+            mx::NodePtr node = elem->asA<mx::Node>();
+            mx::createOGSWrapper(node, blah, ogsStream);
+            break;
+        }
+    }
+
     // Reconstruct and verify that the document contains no images.
     mx::DocumentPtr writtenDoc = mx::createDocument();
     mx::readFromXmlString(writtenDoc, xmlString);
