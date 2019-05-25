@@ -24,6 +24,8 @@
 #include <vector>
 #include <set>
 
+#include <MaterialXGenGlsl/GlslShaderGenerator.h>
+
 namespace mx = MaterialX;
 
 //
@@ -199,26 +201,37 @@ TEST_CASE("GenShader: OSL Reference Implementation Check", "[genshader]")
 
 TEST_CASE("GenShader: Generate OGS fragment wrappers", "[genogsfrag]")
 {
-    mx::DocumentPtr doc = mx::createDocument();
-    mx::FilePath searchPath = mx::FilePath::getCurrentPath() / mx::FilePath("libraries");
-    GenShaderUtil::loadLibraries({ "stdlib" }, searchPath, doc, nullptr);
-    mx::readFromXmlFile(doc, "resources/Materials/TestSuite/stdlib/texture/image.mtlx");
-
-    std::ofstream ogsStream("ogsFragmentDump.xml");
-    mx::StringMap languageMap;
-    std::vector<mx::TypedElementPtr> renderables;
-    mx::findRenderableElements(doc, renderables, false);
-    for (auto elem : renderables)
+    try
     {
-        mx::OutputPtr output = elem->asA<mx::Output>();
-        mx::NodePtr node= nullptr;
-        if (output)
+        mx::DocumentPtr doc = mx::createDocument();
+        mx::FilePath searchPath = mx::FilePath::getCurrentPath() / mx::FilePath("libraries");
+        GenShaderUtil::loadLibraries({ "stdlib" }, searchPath, doc, nullptr);
+        mx::readFromXmlFile(doc, "resources/Materials/TestSuite/stdlib/texture/tiledimage.mtlx");
+
+        std::vector<mx::GenContext*> contexts;
+        mx::GenContext* glslContext = new mx::GenContext(mx::GlslShaderGenerator::create());
+        glslContext->registerSourceCodeSearchPath(searchPath);
+        contexts.push_back(glslContext);
+
+        std::ofstream ogsStream("ogsFragmentDump.xml");
+        std::vector<mx::TypedElementPtr> renderables;
+        mx::findRenderableElements(doc, renderables, false);
+        for (auto elem : renderables)
         {
-            node = output->getConnectedNode();
-            if (node && !node->hasSourceUri())
+            mx::OutputPtr output = elem->asA<mx::Output>();
+            mx::NodePtr node = nullptr;
+            if (output)
             {
-                mx::createOGSWrapper(node, languageMap, ogsStream);
+                node = output->getConnectedNode();
+                if (node && !node->hasSourceUri())
+                {
+                    mx::createOGSWrapper(node, contexts, ogsStream);
+                }
             }
         }
+    }
+    catch (mx::Exception& e)
+    {
+        std::cerr << "Failed to generate OGS XML wrapper: " << e.what() << std::endl;
     }
 }

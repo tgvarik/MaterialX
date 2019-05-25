@@ -7,6 +7,7 @@
 
 #include <MaterialXGenShader/Shader.h>
 #include <MaterialXGenShader/ShaderGenerator.h>
+#include <MaterialXGenShader/GenContext.h>
 
 #include <MaterialXFormat/XmlIo.h>
 #include <MaterialXFormat/PugiXML/pugixml.hpp>
@@ -635,7 +636,7 @@ namespace
     }
 }
 
-void createOGSWrapper(NodePtr node, StringMap& languageMap, std::ostream& stream)
+void createOGSWrapper(NodePtr node, std::vector<GenContext*> contexts, std::ostream& stream)
 {
     NodeDefPtr nodeDef = node->getNodeDef();
     if (!nodeDef)
@@ -715,31 +716,35 @@ void createOGSWrapper(NodePtr node, StringMap& languageMap, std::ostream& stream
         createOGSOutput(xmlOutputs, output->getName(), output->getType(), typeMap);
     }
 
-    // Output implementations for different languages
-    //InterfaceElementPtr impl = nodeDef->getImplementation(target, language);
-    if (languageMap.empty())
-    {
-        languageMap["GLSL"] = "4.0";
-        languageMap["OSL"] = "vanila";
-    }
     pugi::xml_node impls = xmlRoot.append_child("implementation");
-    for (auto l : languageMap)
+
+    string shaderName(node->getName());
+    // Work-around: Need to get a node which can be sampled. Should not be required.
+    vector<PortElementPtr> samplers = node->getDownstreamPorts();
+    if (!samplers.empty())
     {
-        // Need to get the actual code via shader generation.
-        pugi::xml_node impl = impls.append_child("implementation");
+        for (auto context : contexts)
         {
-            impl.append_attribute("render") = "OGSRenderer";
-            impl.append_attribute("language") = l.first.c_str();
-            impl.append_attribute("lang_version") = l.second.c_str();
-        }
-        pugi::xml_node func = impl.append_child("function_name");
-        {
-            func.append_attribute("val") = ""; // TODO : need function name
-        }
-        pugi::xml_node source = impl.append_child("source");
-        {
-            // How to embed the text data?
-            source.set_value("// EMPTY");
+            PortElementPtr port = samplers[0];
+            ShaderGenerator& generator = context->getShaderGenerator();
+            ShaderPtr shader = generator.generate(shaderName, port, *context);
+            const std::string& code = shader->getSourceCode();
+
+            // Need to get the actual code via shader generation.
+            pugi::xml_node impl = impls.append_child("implementation");
+            {
+                impl.append_attribute("render") = "OGSRenderer";
+                impl.append_attribute("language") = generator.getLanguage().c_str();
+                impl.append_attribute("lang_version") = generator.getTarget().c_str();
+            }
+            pugi::xml_node func = impl.append_child("function_name");
+            {
+                func.append_attribute("val") = ""; // TODO : need function name
+            }
+            pugi::xml_node source = impl.append_child("source");
+            {
+                source.append_child(pugi::node_cdata).set_value(code.c_str());
+            }
         }
     }
 
