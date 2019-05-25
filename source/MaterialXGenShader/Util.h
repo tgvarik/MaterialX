@@ -73,6 +73,8 @@ void findRenderableElements(const DocumentPtr& doc, std::vector<TypedElementPtr>
 /// if the path is to a Node as definitions for Nodes can be target specific.
 ValueElementPtr findNodeDefChild(const string& path, DocumentPtr doc, const string& target);
 
+void createOGSWrapper(NodePtr node, StringMap& languageMap, std::ostream& stream);
+
 } // namespace MaterialX
 
 #endif

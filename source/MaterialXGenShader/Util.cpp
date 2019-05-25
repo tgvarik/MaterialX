@@ -9,11 +9,14 @@
 #include <MaterialXGenShader/ShaderGenerator.h>
 
 #include <MaterialXFormat/XmlIo.h>
+#include <MaterialXFormat/PugiXML/pugixml.hpp>
 
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <unordered_set>
+
+
 
 namespace MaterialX
 {
@@ -577,6 +580,170 @@ ValueElementPtr findNodeDefChild(const string& path, DocumentPtr doc, const stri
     ValueElementPtr valueElement = nodeDef->getActiveValueElement(valueElementName);
 
     return valueElement;
+}
+
+namespace
+{
+    void createOGSProperty(pugi::xml_node& propertiesNode, pugi::xml_node& valuesNode,
+        const std::string& name,
+        const std::string& type,
+        const std::string& value,
+        const std::string& semantic,
+        StringMap& typeMap)
+    {
+        // Special case filename
+        if (type == "filename")
+        {
+            pugi::xml_node txt = propertiesNode.append_child("texture2");
+            txt.append_attribute("name") = name.c_str();
+            pugi::xml_node samp = propertiesNode.append_child("sampler");
+            samp.append_attribute("name") = (name + "_textureSampler").c_str();
+        }
+        // Q: How to handle geometry streams?
+        else
+        {
+            string ogsType = typeMap[type];
+            if (!typeMap.count(type))
+                return;
+
+            pugi::xml_node prop = propertiesNode.append_child(ogsType.c_str());
+            prop.append_attribute("name") = name.c_str();
+            if (!semantic.empty())
+            {
+                prop.append_attribute("semantic") = semantic.c_str();
+                prop.append_attribute("flags") = "varyingInputParam";
+            }
+
+            pugi::xml_node val = valuesNode.append_child(ogsType.c_str());
+            val.append_attribute("name") = name.c_str();
+            val.append_attribute("value") = value.c_str();
+        }
+    }
+
+    // Creates output children on "outputs" node
+    void createOGSOutput(pugi::xml_node& outputsNode,
+        const std::string& name,
+        const std::string& type,
+        StringMap& typeMap)
+    {
+        if (!typeMap.count(type))
+            return;
+
+        string ogsType = typeMap[type];
+        pugi::xml_node prop = outputsNode.append_child(ogsType.c_str());
+        prop.append_attribute("name") = name.c_str();
+    }
+}
+
+void createOGSWrapper(NodePtr node, StringMap& languageMap, std::ostream& stream)
+{
+    NodeDefPtr nodeDef = node->getNodeDef();
+    if (!nodeDef)
+    {
+        return;
+    }
+
+    // Make from MTLX to OGS types
+    static StringMap typeMap;
+    typeMap["boolean"] = "bool";
+    typeMap["float"] = "float";
+    typeMap["integer"] = "int";
+    typeMap["string"] = "string";
+    typeMap[MaterialX::TypedValue<MaterialX::Matrix44>::TYPE] = "float4x4";
+    // There is no mapping for this, so binder needs to promote from 3x3 to 4x4 before binding.
+    typeMap[MaterialX::TypedValue<MaterialX::Matrix33>::TYPE] = "float4x4";
+    typeMap[MaterialX::TypedValue<MaterialX::Color2>::TYPE] = "float2";
+    typeMap[MaterialX::TypedValue<MaterialX::Color3>::TYPE] = "color";
+    // To determine if this reqiures a struct creation versus allowing for colorAlpha.
+    // Could also just use a float4
+    typeMap[MaterialX::TypedValue<MaterialX::Color4>::TYPE] = "colorAlpha";
+    typeMap[MaterialX::TypedValue<MaterialX::Vector2>::TYPE] = "float2";
+    typeMap[MaterialX::TypedValue<MaterialX::Vector3>::TYPE] = "float3";
+    typeMap[MaterialX::TypedValue<MaterialX::Vector4>::TYPE] = "float4";
+
+    pugi::xml_document xmlDoc;
+    const string OGS_FRAGMENT("fragment");
+    const string OGS_PLUMBING("plumbing");
+    const string OGS_SHADERFRAGMENT("ShadeFragment");
+    const string OGS_VERSION_STRING(node->getDocument()->getVersionString());
+    const string OGS_PROPERTIES("properties");
+    const string OGS_VALUES("values");
+
+    pugi::xml_node xmlRoot = xmlDoc.append_child(OGS_FRAGMENT.c_str());
+    xmlRoot.append_attribute("name") = node->getName().c_str();
+    xmlRoot.append_attribute("type") = OGS_PLUMBING.c_str();
+    xmlRoot.append_attribute("class") = OGS_SHADERFRAGMENT.c_str();
+    xmlRoot.append_attribute("version") = OGS_VERSION_STRING.c_str();
+
+    // Scan inputs and parameters and create "properties" and 
+    // "values" children from the nodeDef
+    string semantic;
+    pugi::xml_node xmlProperties = xmlRoot.append_child(OGS_PROPERTIES.c_str());
+    pugi::xml_node xmlValues = xmlRoot.append_child(OGS_VALUES.c_str());
+    for (auto input : node->getInputs())
+    {
+        string value = input->getValue() ? input->getValue()->getValueString() : "";
+
+        GeomPropDefPtr geomprop = input->getDefaultGeomProp();
+        if (geomprop)
+        {
+            string geomNodeDefName = "ND_" + geomprop->getGeomProp() + "_" + input->getType();
+            NodeDefPtr geomNodeDef = node->getDocument()->getNodeDef(geomNodeDefName);
+            if (geomNodeDef)
+            {
+                string geompropString = geomNodeDef->getAttribute("node");
+                if (geompropString == "texcoord")
+                {
+                    semantic = "mayaUvCoordSemantic";
+                }
+            }
+        }
+        createOGSProperty(xmlProperties, xmlValues,
+            input->getName(), input->getType(), value, semantic, typeMap);
+    }
+    for (auto input : node->getParameters())
+    {
+        string value = input->getValue() ? input->getValue()->getValueString() : "";
+        createOGSProperty(xmlProperties, xmlValues,
+            input->getName(), input->getType(), value, "", typeMap);
+    }
+
+    // Scan outputs and create "outputs"
+    pugi::xml_node xmlOutputs = xmlRoot.append_child("outputs");
+    for (auto output : node->getActiveOutputs())
+    {
+        createOGSOutput(xmlOutputs, output->getName(), output->getType(), typeMap);
+    }
+
+    // Output implementations for different languages
+    //InterfaceElementPtr impl = nodeDef->getImplementation(target, language);
+    if (languageMap.empty())
+    {
+        languageMap["GLSL"] = "4.0";
+        languageMap["OSL"] = "vanila";
+    }
+    pugi::xml_node impls = xmlRoot.append_child("implementation");
+    for (auto l : languageMap)
+    {
+        // Need to get the actual code via shader generation.
+        pugi::xml_node impl = impls.append_child("implementation");
+        {
+            impl.append_attribute("render") = "OGSRenderer";
+            impl.append_attribute("language") = l.first.c_str();
+            impl.append_attribute("lang_version") = l.second.c_str();
+        }
+        pugi::xml_node func = impl.append_child("function_name");
+        {
+            func.append_attribute("val") = ""; // TODO : need function name
+        }
+        pugi::xml_node source = impl.append_child("source");
+        {
+            // How to embed the text data?
+            source.set_value("// EMPTY");
+        }
+    }
+
+    xmlDoc.save(stream, "  ");
 }
 
 } // namespace MaterialX

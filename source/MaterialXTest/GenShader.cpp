@@ -196,3 +196,29 @@ TEST_CASE("GenShader: OSL Reference Implementation Check", "[genshader]")
     // To enable once this is true
     //REQUIRE(missing == 0);
 }
+
+TEST_CASE("GenShader: Generate OGS fragment wrappers", "[genogsfrag]")
+{
+    mx::DocumentPtr doc = mx::createDocument();
+    mx::FilePath searchPath = mx::FilePath::getCurrentPath() / mx::FilePath("libraries");
+    GenShaderUtil::loadLibraries({ "stdlib" }, searchPath, doc, nullptr);
+    mx::readFromXmlFile(doc, "resources/Materials/TestSuite/stdlib/texture/image.mtlx");
+
+    std::ofstream ogsStream("ogsFragmentDump.xml");
+    mx::StringMap languageMap;
+    std::vector<mx::TypedElementPtr> renderables;
+    mx::findRenderableElements(doc, renderables, false);
+    for (auto elem : renderables)
+    {
+        mx::OutputPtr output = elem->asA<mx::Output>();
+        mx::NodePtr node= nullptr;
+        if (output)
+        {
+            node = output->getConnectedNode();
+            if (node && !node->hasSourceUri())
+            {
+                mx::createOGSWrapper(node, languageMap, ogsStream);
+            }
+        }
+    }
+}

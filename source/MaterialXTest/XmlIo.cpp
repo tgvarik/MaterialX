@@ -13,36 +13,6 @@
 
 namespace mx = MaterialX;
 
-void loadLibrary(const mx::FilePath& file, mx::DocumentPtr doc)
-{
-    mx::DocumentPtr libDoc = mx::createDocument();
-    mx::readFromXmlFile(libDoc, file);
-    mx::CopyOptions copyOptions;
-    copyOptions.skipDuplicateElements = true;
-    doc->importLibrary(libDoc, &copyOptions);
-}
-
-void loadLibraries(const mx::StringVec& libraryNames,
-    const mx::FilePath& searchPath,
-    mx::DocumentPtr doc,
-    const mx::StringSet* excludeFiles)
-{
-    for (const std::string& library : libraryNames)
-    {
-        mx::FilePath libraryPath = searchPath / library;
-        for (const mx::FilePath& path : libraryPath.getSubDirectories())
-        {
-            for (const mx::FilePath& filename : path.getFilesInDirectory(mx::MTLX_EXTENSION))
-            {
-                if (!excludeFiles || !excludeFiles->count(filename))
-                {
-                    loadLibrary(path / filename, doc);
-                }
-            }
-        }
-    }
-}
-
 TEST_CASE("Load content", "[xmlio]")
 {
     mx::FilePath libraryPath("libraries/stdlib");
@@ -199,22 +169,6 @@ TEST_CASE("Load content", "[xmlio]")
     writeOptions.elementPredicate = skipImages;
     std::string xmlString = mx::writeToXmlString(doc, &writeOptions);
      
-    mx::FilePath searchPath2 = mx::FilePath::getCurrentPath() / mx::FilePath("libraries");
-    loadLibraries({ "stdlib" }, searchPath2, doc, nullptr);
-
-    std::string ogsFN = "ogsDump.xml";
-    std::ofstream ogsStream(ogsFN);
-    mx::StringMap blah;
-    for (mx::ElementPtr elem : doc->traverseTree())
-    {
-        if (elem->isA<mx::Node>("image"))
-        {
-            mx::NodePtr node = elem->asA<mx::Node>();
-            mx::createOGSWrapper(node, blah, ogsStream);
-            break;
-        }
-    }
-
     // Reconstruct and verify that the document contains no images.
     mx::DocumentPtr writtenDoc = mx::createDocument();
     mx::readFromXmlString(writtenDoc, xmlString);
