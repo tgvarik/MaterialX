@@ -74,6 +74,8 @@ void findRenderableElements(const DocumentPtr& doc, std::vector<TypedElementPtr>
 ValueElementPtr findNodeDefChild(const string& path, DocumentPtr doc, const string& target);
 
 void createOGSWrapper(NodePtr node, std::vector<GenContext*> contexts, std::ostream& stream);
+void createOGSWrapperFromShader(NodePtr node, GenContext& context, std::ostream& stream);
+
 
 } // namespace MaterialX
 

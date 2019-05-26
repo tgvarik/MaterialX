@@ -6,7 +6,7 @@
 #include <MaterialXGenShader/Util.h>
 
 #include <MaterialXGenShader/Shader.h>
-#include <MaterialXGenShader/ShaderGenerator.h>
+#include <MaterialXGenShader/HwShaderGenerator.h>
 #include <MaterialXGenShader/GenContext.h>
 
 #include <MaterialXFormat/XmlIo.h>
@@ -16,8 +16,6 @@
 #include <iostream>
 #include <sstream>
 #include <unordered_set>
-
-
 
 namespace MaterialX
 {
@@ -615,9 +613,12 @@ namespace
                 prop.append_attribute("flags") = "varyingInputParam";
             }
 
-            pugi::xml_node val = valuesNode.append_child(ogsType.c_str());
-            val.append_attribute("name") = name.c_str();
-            val.append_attribute("value") = value.c_str();
+            if (!value.empty())
+            {
+                pugi::xml_node val = valuesNode.append_child(ogsType.c_str());
+                val.append_attribute("name") = name.c_str();
+                val.append_attribute("value") = value.c_str();
+            }
         }
     }
 
@@ -739,13 +740,239 @@ void createOGSWrapper(NodePtr node, std::vector<GenContext*> contexts, std::ostr
             }
             pugi::xml_node func = impl.append_child("function_name");
             {
-                func.append_attribute("val") = ""; // TODO : need function name
+                // TODO: Figure out what is the proper functio nname to use
+                func.append_attribute("val") = nodeDef->getName().c_str();
             }
             pugi::xml_node source = impl.append_child("source");
             {
                 source.append_child(pugi::node_cdata).set_value(code.c_str());
             }
         }
+    }
+
+    xmlDoc.save(stream, "  ");
+}
+
+void createOGSWrapperFromShader(NodePtr node, GenContext& context, std::ostream& stream)
+{
+    NodeDefPtr nodeDef = node->getNodeDef();
+    if (!nodeDef)
+    {
+        return;
+    }
+
+    // Work-around: Need to get a node which can be sampled. Should not be required.
+    vector<PortElementPtr> samplers = node->getDownstreamPorts();
+    if (samplers.empty())
+    {
+        return;
+    }
+
+    string shaderName(node->getName());
+    PortElementPtr port = samplers[0];
+    ShaderGenerator& generator = context.getShaderGenerator();
+    ShaderPtr shader = generator.generate(shaderName, port, context);
+    if (!shader)
+    {
+        return;
+    }
+    const std::string& code = shader->getSourceCode();
+    if (code.empty())
+    {
+        return;
+    }
+
+    // Make from MTLX to OGS types
+    static StringMap typeMap;
+    typeMap["boolean"] = "bool";
+    typeMap["float"] = "float";
+    typeMap["integer"] = "int";
+    typeMap["string"] = "string";
+    typeMap[MaterialX::TypedValue<MaterialX::Matrix44>::TYPE] = "float4x4";
+    // There is no mapping for this, so binder needs to promote from 3x3 to 4x4 before binding.
+    typeMap[MaterialX::TypedValue<MaterialX::Matrix33>::TYPE] = "float4x4";
+    typeMap[MaterialX::TypedValue<MaterialX::Color2>::TYPE] = "float2";
+    typeMap[MaterialX::TypedValue<MaterialX::Color3>::TYPE] = "color";
+    // To determine if this reqiures a struct creation versus allowing for colorAlpha.
+    // Could also just use a float4
+    typeMap[MaterialX::TypedValue<MaterialX::Color4>::TYPE] = "colorAlpha";
+    typeMap[MaterialX::TypedValue<MaterialX::Vector2>::TYPE] = "float2";
+    typeMap[MaterialX::TypedValue<MaterialX::Vector3>::TYPE] = "float3";
+    typeMap[MaterialX::TypedValue<MaterialX::Vector4>::TYPE] = "float4";
+
+    pugi::xml_document xmlDoc;
+    const string OGS_FRAGMENT("fragment");
+    const string OGS_PLUMBING("plumbing");
+    const string OGS_SHADERFRAGMENT("ShadeFragment");
+    const string OGS_VERSION_STRING(node->getDocument()->getVersionString());
+    const string OGS_PROPERTIES("properties");
+    const string OGS_VALUES("values");
+
+    pugi::xml_node xmlRoot = xmlDoc.append_child(OGS_FRAGMENT.c_str());
+    xmlRoot.append_attribute("name") = node->getName().c_str();
+    xmlRoot.append_attribute("type") = OGS_PLUMBING.c_str();
+    xmlRoot.append_attribute("class") = OGS_SHADERFRAGMENT.c_str();
+    xmlRoot.append_attribute("version") = OGS_VERSION_STRING.c_str();
+
+    // Scan uniform inputs and create "properties" and "values" children.
+    pugi::xml_node xmlProperties = xmlRoot.append_child(OGS_PROPERTIES.c_str());
+    pugi::xml_node xmlValues = xmlRoot.append_child(OGS_VALUES.c_str());
+
+    const ShaderStage& ps = shader->getStage(Stage::PIXEL);
+    for (auto uniformsIt : ps.getUniformBlocks())
+    {
+        const VariableBlock& uniforms = *uniformsIt.second;
+        // Skip light uniforms
+        if (uniforms.getName() == HW::LIGHT_DATA)
+        {
+            continue;
+        }
+
+        for (size_t i=0; i<uniforms.size(); i++)
+        {
+            const ShaderPort* uniform = uniforms[i];
+            if (!uniform)
+            {
+                continue;
+            }
+            string name = uniform->getName();
+            if (name.empty())
+            {
+                continue;
+            }
+
+            string path = uniform->getPath();
+            ValuePtr valuePtr = uniform->getValue();
+            string value = valuePtr ? valuePtr->getValueString() : EMPTY_STRING;
+            string typeString = uniform->getType()->getName();
+            string semantic = uniform->getSemantic();
+            string variable = uniform->getVariable();
+
+            createOGSProperty(xmlProperties, xmlValues,
+                name, typeString, value, semantic, typeMap);
+        }
+    }
+
+    // Set geometric inputs 
+    const ShaderStage& vs = shader->getStage(Stage::VERTEX);
+    const VariableBlock& vertexInputs = vs.getInputBlock(HW::VERTEX_INPUTS);
+    if (!vertexInputs.empty())
+    {
+        for (size_t i = 0; i < vertexInputs.size(); ++i)
+        {
+            const ShaderPort* vertexInput = vertexInputs[i];
+            if (!vertexInput)
+            {
+                continue;
+            }
+            string name = vertexInput->getName();
+            if (name.empty())
+            {
+                continue;
+            }
+            ValuePtr valuePtr = vertexInput->getValue();
+            string value = valuePtr ? valuePtr->getValueString() : EMPTY_STRING;
+            string typeString = vertexInput->getType()->getName();
+            string semantic = vertexInput->getSemantic();
+            if (name.find("i_position") != std::string::npos)
+            {
+            }
+            else if (name.find("i_texcoord_") != std::string::npos)
+            {
+                semantic = "mayaUvCoordSemantic";
+            }
+            else if (name.find("i_normal") != std::string::npos)
+            {
+            }
+            else if (name.find("i_tangent") != std::string::npos)
+            {
+            }
+            else if (name.find("i_bitangent") != std::string::npos)
+            {
+            }
+            else if (name.find("i_color_") != std::string::npos)
+            {
+            }
+
+            createOGSProperty(xmlProperties, xmlValues,
+                name, typeString, value, semantic, typeMap);
+        }
+    }
+
+    // Scan outputs and create "outputs"
+    pugi::xml_node xmlOutputs = xmlRoot.append_child("outputs");
+    for (auto uniformsIt : ps.getOutputBlocks())
+    {
+        const VariableBlock& uniforms = *uniformsIt.second;
+        for (size_t i = 0; i < uniforms.size(); ++i)
+        {
+            const ShaderPort* v = uniforms[i];
+            string name = v->getName();
+            if (name.empty())
+            {
+                continue;
+            }
+            string path = v->getPath();
+            string typeString = v->getType()->getName();
+            createOGSOutput(xmlOutputs, name, typeString, typeMap);
+        }
+    }
+
+#if 0
+    for (auto input : node->getInputs())
+    {
+        string value = input->getValue() ? input->getValue()->getValueString() : "";
+
+        GeomPropDefPtr geomprop = input->getDefaultGeomProp();
+        if (geomprop)
+        {
+            string geomNodeDefName = "ND_" + geomprop->getGeomProp() + "_" + input->getType();
+            NodeDefPtr geomNodeDef = node->getDocument()->getNodeDef(geomNodeDefName);
+            if (geomNodeDef)
+            {
+                string geompropString = geomNodeDef->getAttribute("node");
+                if (geompropString == "texcoord")
+                {
+                    semantic = "mayaUvCoordSemantic";
+                }
+            }
+        }
+        createOGSProperty(xmlProperties, xmlValues,
+            input->getName(), input->getType(), value, semantic, typeMap);
+    }
+    for (auto input : node->getParameters())
+    {
+        string value = input->getValue() ? input->getValue()->getValueString() : "";
+        createOGSProperty(xmlProperties, xmlValues,
+            input->getName(), input->getType(), value, "", typeMap);
+    }
+
+    // Scan outputs and create "outputs"
+    pugi::xml_node xmlOutputs = xmlRoot.append_child("outputs");
+    for (auto output : node->getActiveOutputs())
+    {
+        createOGSOutput(xmlOutputs, output->getName(), output->getType(), typeMap);
+    }
+#endif
+
+    pugi::xml_node impls = xmlRoot.append_child("implementation");
+
+    // Need to get the actual code via shader generation.
+    pugi::xml_node impl = impls.append_child("implementation");
+    {
+        impl.append_attribute("render") = "OGSRenderer";
+        impl.append_attribute("language") = generator.getLanguage().c_str();
+        impl.append_attribute("lang_version") = generator.getTarget().c_str();
+    }
+    pugi::xml_node func = impl.append_child("function_name");
+    {
+        // This will need to change for graphs, but should
+        // work for single nodes.
+        func.append_attribute("val") = nodeDef->getName().c_str();
+    }
+    pugi::xml_node source = impl.append_child("source");
+    {
+        source.append_child(pugi::node_cdata).set_value(code.c_str());
     }
 
     xmlDoc.save(stream, "  ");

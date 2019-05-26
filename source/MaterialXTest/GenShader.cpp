@@ -225,7 +225,7 @@ TEST_CASE("GenShader: Generate OGS fragment wrappers", "[genogsfrag]")
                 node = output->getConnectedNode();
                 if (node && !node->hasSourceUri())
                 {
-                    mx::createOGSWrapper(node, contexts, ogsStream);
+                    mx::createOGSWrapperFromShader(node, *glslContext, ogsStream);
                 }
             }
         }
