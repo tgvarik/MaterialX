@@ -206,7 +206,8 @@ TEST_CASE("GenShader: Generate OGS fragment wrappers", "[genogsfrag]")
         mx::DocumentPtr doc = mx::createDocument();
         mx::FilePath searchPath = mx::FilePath::getCurrentPath() / mx::FilePath("libraries");
         GenShaderUtil::loadLibraries({ "stdlib" }, searchPath, doc, nullptr);
-        mx::readFromXmlFile(doc, "resources/Materials/TestSuite/stdlib/texture/tiledimage.mtlx");
+        mx::readFromXmlFile(doc, "resources/Materials/TestSuite/stdlib/geometric/streams.mtlx");
+        //mx::readFromXmlFile(doc, "resources/Materials/TestSuite/stdlib/texture/tiledimage.mtlx");
 
         std::vector<mx::GenContext*> contexts;
         mx::GenContext* glslContext = new mx::GenContext(mx::GlslShaderGenerator::create());

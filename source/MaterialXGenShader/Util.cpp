@@ -874,24 +874,33 @@ void createOGSWrapperFromShader(NodePtr node, GenContext& context, std::ostream&
             string value = valuePtr ? valuePtr->getValueString() : EMPTY_STRING;
             string typeString = vertexInput->getType()->getName();
             string semantic = vertexInput->getSemantic();
+            const std::string colorSet("i_color_");
+            const std::string uvSet("i_texcoord_");
             if (name.find("i_position") != std::string::npos)
             {
+                semantic = "Pw"; // "Pm" if object space
             }
-            else if (name.find("i_texcoord_") != std::string::npos)
+            else if (name.find(uvSet) != std::string::npos)
             {
                 semantic = "mayaUvCoordSemantic";
+                //std::string setNumber = name.substr(uvSet.size(), name.size());
             }
             else if (name.find("i_normal") != std::string::npos)
             {
+                semantic = "Nw";
             }
             else if (name.find("i_tangent") != std::string::npos)
             {
+                semantic = "mayaTangentIn";
             }
             else if (name.find("i_bitangent") != std::string::npos)
             {
+                semantic = "mayaBitangentIn";
             }
-            else if (name.find("i_color_") != std::string::npos)
+            else if (name.find(colorSet) != std::string::npos)
             {
+                semantic = "colorset";
+                //std::string setNumber = name.substr(colorSet.size(), name.size());
             }
 
             createOGSProperty(xmlProperties, xmlValues,
@@ -918,43 +927,6 @@ void createOGSWrapperFromShader(NodePtr node, GenContext& context, std::ostream&
         }
     }
 
-#if 0
-    for (auto input : node->getInputs())
-    {
-        string value = input->getValue() ? input->getValue()->getValueString() : "";
-
-        GeomPropDefPtr geomprop = input->getDefaultGeomProp();
-        if (geomprop)
-        {
-            string geomNodeDefName = "ND_" + geomprop->getGeomProp() + "_" + input->getType();
-            NodeDefPtr geomNodeDef = node->getDocument()->getNodeDef(geomNodeDefName);
-            if (geomNodeDef)
-            {
-                string geompropString = geomNodeDef->getAttribute("node");
-                if (geompropString == "texcoord")
-                {
-                    semantic = "mayaUvCoordSemantic";
-                }
-            }
-        }
-        createOGSProperty(xmlProperties, xmlValues,
-            input->getName(), input->getType(), value, semantic, typeMap);
-    }
-    for (auto input : node->getParameters())
-    {
-        string value = input->getValue() ? input->getValue()->getValueString() : "";
-        createOGSProperty(xmlProperties, xmlValues,
-            input->getName(), input->getType(), value, "", typeMap);
-    }
-
-    // Scan outputs and create "outputs"
-    pugi::xml_node xmlOutputs = xmlRoot.append_child("outputs");
-    for (auto output : node->getActiveOutputs())
-    {
-        createOGSOutput(xmlOutputs, output->getName(), output->getType(), typeMap);
-    }
-#endif
-
     pugi::xml_node impls = xmlRoot.append_child("implementation");
 
     // Need to get the actual code via shader generation.
@@ -972,7 +944,9 @@ void createOGSWrapperFromShader(NodePtr node, GenContext& context, std::ostream&
     }
     pugi::xml_node source = impl.append_child("source");
     {
-        source.append_child(pugi::node_cdata).set_value(code.c_str());
+        // Works but is the incorrect code currently
+        //source.append_child(pugi::node_cdata).set_value(code.c_str());
+        source.append_child(pugi::node_cdata).set_value("// Code here");
     }
 
     xmlDoc.save(stream, "  ");
