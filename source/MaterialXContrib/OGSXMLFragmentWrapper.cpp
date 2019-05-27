@@ -43,7 +43,7 @@ OGSXMLFragmentWrapper::OGSXMLFragmentWrapper()
 
 OGSXMLFragmentWrapper::~OGSXMLFragmentWrapper()
 {
-    delete _xmlDocument;
+    delete (static_cast<pugi::xml_document*>(_xmlDocument));
 }
 
 namespace
