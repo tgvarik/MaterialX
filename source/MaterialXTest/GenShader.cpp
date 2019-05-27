@@ -26,6 +26,10 @@
 
 #include <MaterialXGenGlsl/GlslShaderGenerator.h>
 
+#if defined (MATERIALX_BUILD_CONTRIB)
+#include <MaterialXContrib/OGSXMLFragmentWrapper.h>
+#endif
+
 namespace mx = MaterialX;
 
 //
@@ -199,10 +203,13 @@ TEST_CASE("GenShader: OSL Reference Implementation Check", "[genshader]")
     //REQUIRE(missing == 0);
 }
 
+#if defined (MATERIALX_BUILD_CONTRIB)
 TEST_CASE("GenShader: Generate OGS fragment wrappers", "[genogsfrag]")
 {
     try
     {
+        mx::OGSXMLFragmentWrapper wrapper;
+
         mx::DocumentPtr doc = mx::createDocument();
         mx::FilePath searchPath = mx::FilePath::getCurrentPath() / mx::FilePath("libraries");
         GenShaderUtil::loadLibraries({ "stdlib" }, searchPath, doc, nullptr);
@@ -226,13 +233,16 @@ TEST_CASE("GenShader: Generate OGS fragment wrappers", "[genogsfrag]")
                 node = output->getConnectedNode();
                 if (node && !node->hasSourceUri())
                 {
-                    mx::createOGSWrapperFromShader(node, *glslContext, ogsStream);
+                    wrapper.createWrapperFromShader(node, *glslContext);
                 }
             }
         }
+        wrapper.getDocument(ogsStream);
+        ogsStream.close();
     }
     catch (mx::Exception& e)
     {
         std::cerr << "Failed to generate OGS XML wrapper: " << e.what() << std::endl;
     }
 }
+#endif

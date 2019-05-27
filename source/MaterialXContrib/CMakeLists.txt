@@ -5,11 +5,17 @@ include_directories(
 
 file(GLOB_RECURSE materialx_source "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
 file(GLOB_RECURSE materialx_header "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
+file(GLOB pugixml_source "${CMAKE_CURRENT_SOURCE_DIR}/../MaterialXFormat/PugiXML/*.cpp")
+file(GLOB pugixml_headers "${CMAKE_CURRENT_SOURCE_DIR}/../MaterialXFormat/PugiXML/*.hpp")
 
 assign_source_group("Header Files" ${materialx_header})
 assign_source_group("Source Files" ${materialx_source})
 
-add_library(MaterialXContrib STATIC ${materialx_source} ${materialx_header})
+add_library(MaterialXContrib STATIC 
+    ${materialx_source} 
+    ${materialx_header}
+    ${pugixml_source} 
+    ${pugixml_headers})
 
 set_target_properties(
     MaterialXContrib PROPERTIES
