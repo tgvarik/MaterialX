@@ -218,6 +218,8 @@ TEST_CASE("GenShader: Generate OGS fragment wrappers", "[genogsfrag]")
 
         std::vector<mx::GenContext*> contexts;
         mx::GenContext* glslContext = new mx::GenContext(mx::GlslShaderGenerator::create());
+        // Stop emission of environment map lookups.
+        glslContext->getOptions().hwSpecularEnvironmentMethod = mx::SPECULAR_ENVIRONMENT_NONE;
         glslContext->registerSourceCodeSearchPath(searchPath);
         contexts.push_back(glslContext);
 
