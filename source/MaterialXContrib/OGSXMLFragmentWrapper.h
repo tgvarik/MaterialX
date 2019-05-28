@@ -44,6 +44,18 @@ class OGSXMLFragmentWrapper
         return _outputVertexShader;
     }
 
+    /// Get list of Element paths and corresponding fragment input names
+    const StringMap& getPathInputMap() const
+    {
+        return _pathInputMap;
+    }
+
+    /// Get list of Element paths and corresponding fragment output names
+    const StringMap& getPathOutputMap() const
+    {
+        return _pathOutputMap;
+    }
+
   protected:
     // Mapping from MTLX keywords to OGS fragment XML keywords
     StringMap _typeMap;
@@ -52,6 +64,12 @@ class OGSXMLFragmentWrapper
     
     // Internally cache XML document
     void* _xmlDocument;
+
+    // Mapping from MTLX Element paths to fragment input names
+    StringMap _pathInputMap;
+
+    // Mapping from MTLX Element paths to fragment output names
+    StringMap _pathOutputMap;
 };
 
 } // namespace MaterialX

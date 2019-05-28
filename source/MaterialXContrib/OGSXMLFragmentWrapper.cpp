@@ -253,6 +253,9 @@ void OGSXMLFragmentWrapper::createWrapperFromNode(NodePtr node, std::vector<GenC
 
 void OGSXMLFragmentWrapper::createWrapperFromShader(NodePtr node, GenContext& context)
 {
+    _pathInputMap.clear();
+    _pathOutputMap.clear();
+
     NodeDefPtr nodeDef = node->getNodeDef();
     if (!nodeDef)
     {
@@ -329,6 +332,8 @@ void OGSXMLFragmentWrapper::createWrapperFromShader(NodePtr node, GenContext& co
 
             createOGSProperty(xmlProperties, xmlValues,
                 name, typeString, value, semantic, _typeMap);
+
+            _pathInputMap[path] = name;
         }
     }
 
@@ -382,6 +387,8 @@ void OGSXMLFragmentWrapper::createWrapperFromShader(NodePtr node, GenContext& co
             // generation should have added a transform already (i.e. mayaCMSemantic)
             string semantic = v->getSemantic();
             createOGSOutput(xmlOutputs, name, typeString, semantic, _typeMap);
+
+            _pathOutputMap[path] = name;
         }
     }
 
@@ -414,9 +421,6 @@ void OGSXMLFragmentWrapper::createWrapperFromShader(NodePtr node, GenContext& co
         // Works but is the incorrect code currently
         pixelSource.append_child(pugi::node_cdata).set_value(pixelShaderCode.c_str());
     }
-
-
-
 }
 
 void OGSXMLFragmentWrapper::getDocument(std::ostream& stream)

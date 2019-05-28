@@ -211,7 +211,6 @@ TEST_CASE("GenShader: Generate OGS fragment wrappers", "[genogsfrag]")
 {
     try
     {
-
         mx::DocumentPtr doc = mx::createDocument();
         mx::FilePath searchPath = mx::FilePath::getCurrentPath() / mx::FilePath("libraries");
         GenShaderUtil::loadLibraries({ "stdlib" }, searchPath, doc, nullptr);
@@ -252,6 +251,16 @@ TEST_CASE("GenShader: Generate OGS fragment wrappers", "[genogsfrag]")
         std::ofstream glslStream("glslOGSXMLFragmentDump.xml");
         glslWrapper.getDocument(glslStream);
         glslStream.close();
+        const mx::StringMap& inputs = glslWrapper.getPathInputMap();
+        for (auto i : inputs)
+        {
+            std::cout << "Element: " << i.first << " maps to fragment input: " << i.second << std::endl;
+        }
+        const mx::StringMap& outputs = glslWrapper.getPathOutputMap();
+        for (auto o : outputs)
+        {
+            std::cout << "Element: " << o.first << " maps to fragment output: " << o.second << std::endl;
+        }
 
         std::ofstream oslStream("oslOGSXMLFragmentDump.xml");
         oslWrapper.getDocument(oslStream);
