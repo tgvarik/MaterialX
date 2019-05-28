@@ -24,7 +24,10 @@
 #include <vector>
 #include <set>
 
+#if defined (MATERIALX_BUILD_CONTRIB)
 #include <MaterialXGenGlsl/GlslShaderGenerator.h>
+#include <MaterialXGenOsl/OslShaderGenerator.h>
+#endif
 
 #if defined (MATERIALX_BUILD_CONTRIB)
 #include <MaterialXContrib/OGSXMLFragmentWrapper.h>
@@ -208,13 +211,12 @@ TEST_CASE("GenShader: Generate OGS fragment wrappers", "[genogsfrag]")
 {
     try
     {
-        mx::OGSXMLFragmentWrapper wrapper;
 
         mx::DocumentPtr doc = mx::createDocument();
         mx::FilePath searchPath = mx::FilePath::getCurrentPath() / mx::FilePath("libraries");
         GenShaderUtil::loadLibraries({ "stdlib" }, searchPath, doc, nullptr);
-        mx::readFromXmlFile(doc, "resources/Materials/TestSuite/stdlib/geometric/streams.mtlx");
-        //mx::readFromXmlFile(doc, "resources/Materials/TestSuite/stdlib/texture/tiledimage.mtlx");
+        //mx::readFromXmlFile(doc, "resources/Materials/TestSuite/stdlib/geometric/streams.mtlx");
+        mx::readFromXmlFile(doc, "resources/Materials/TestSuite/stdlib/texture/tiledimage.mtlx");
 
         std::vector<mx::GenContext*> contexts;
         mx::GenContext* glslContext = new mx::GenContext(mx::GlslShaderGenerator::create());
@@ -222,8 +224,14 @@ TEST_CASE("GenShader: Generate OGS fragment wrappers", "[genogsfrag]")
         glslContext->getOptions().hwSpecularEnvironmentMethod = mx::SPECULAR_ENVIRONMENT_NONE;
         glslContext->registerSourceCodeSearchPath(searchPath);
         contexts.push_back(glslContext);
+        mx::GenContext* oslContext = new mx::GenContext(mx::OslShaderGenerator::create());
+        oslContext->registerSourceCodeSearchPath(searchPath);
+        contexts.push_back(oslContext);
 
-        std::ofstream ogsStream("ogsFragmentDump.xml");
+        // TODO: We want 1 wrapper with both languages -- not 2 wrappers
+        mx::OGSXMLFragmentWrapper glslWrapper;
+        mx::OGSXMLFragmentWrapper oslWrapper;
+
         std::vector<mx::TypedElementPtr> renderables;
         mx::findRenderableElements(doc, renderables, false);
         for (auto elem : renderables)
@@ -235,12 +243,19 @@ TEST_CASE("GenShader: Generate OGS fragment wrappers", "[genogsfrag]")
                 node = output->getConnectedNode();
                 if (node && !node->hasSourceUri())
                 {
-                    wrapper.createWrapperFromShader(node, *glslContext);
+                    glslWrapper.createWrapperFromShader(node, *glslContext);
+                    oslWrapper.createWrapperFromShader(node, *oslContext);
                 }
             }
         }
-        wrapper.getDocument(ogsStream);
-        ogsStream.close();
+
+        std::ofstream glslStream("glslOGSXMLFragmentDump.xml");
+        glslWrapper.getDocument(glslStream);
+        glslStream.close();
+
+        std::ofstream oslStream("oslOGSXMLFragmentDump.xml");
+        oslWrapper.getDocument(oslStream);
+        oslStream.close();
     }
     catch (mx::Exception& e)
     {

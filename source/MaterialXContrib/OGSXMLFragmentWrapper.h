@@ -18,7 +18,10 @@ namespace MaterialX
 class OGSXMLFragmentWrapper
 {
   public:
+    /// Default constructor
     OGSXMLFragmentWrapper();
+
+    /// Default desctructor
     ~OGSXMLFragmentWrapper();
 
     /// Add a fragment wrapper from a node definition
@@ -29,9 +32,25 @@ class OGSXMLFragmentWrapper
     /// Get the contents of the cached XML document as a stream.
     void getDocument(std::ostream& stream);
 
+    /// Set to output vertex shader code (if any)
+    void setOutputVertexShader(bool val)
+    {
+        _outputVertexShader = val;
+    }
+
+    /// Query if we want to output vertex shader code
+    bool getOutputVertexShader() const
+    {
+        return _outputVertexShader;
+    }
+
   protected:
+    // Mapping from MTLX keywords to OGS fragment XML keywords
     StringMap _typeMap;
 
+    bool _outputVertexShader = false;
+    
+    // Internally cache XML document
     void* _xmlDocument;
 };
 

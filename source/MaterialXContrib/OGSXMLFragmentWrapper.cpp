@@ -34,8 +34,9 @@ OGSXMLFragmentWrapper::OGSXMLFragmentWrapper()
     _typeMap[MaterialX::TypedValue<MaterialX::Color2>::TYPE] = "float2";
     _typeMap[MaterialX::TypedValue<MaterialX::Color3>::TYPE] = "color";
     // To determine if this reqiures a struct creation versus allowing for colorAlpha.
-    // Could also just use a float4
-    _typeMap[MaterialX::TypedValue<MaterialX::Color4>::TYPE] = "colorAlpha";
+    // For now just use float4 as it's generic
+    //_typeMap[MaterialX::TypedValue<MaterialX::Color4>::TYPE] = "colorAlpha";
+    _typeMap[MaterialX::TypedValue<MaterialX::Color4>::TYPE] = "float4";
     _typeMap[MaterialX::TypedValue<MaterialX::Vector2>::TYPE] = "float2";
     _typeMap[MaterialX::TypedValue<MaterialX::Vector3>::TYPE] = "float3";
     _typeMap[MaterialX::TypedValue<MaterialX::Vector4>::TYPE] = "float4";
@@ -73,7 +74,6 @@ void createOGSProperty(pugi::xml_node& propertiesNode, pugi::xml_node& valuesNod
         pugi::xml_node samp = propertiesNode.append_child(OGS_SAMPLER.c_str());
         samp.append_attribute(XML_NAME_STRING.c_str()) = (name + "_textureSampler").c_str();
     }
-    // Q: How to handle geometry streams?
     else
     {
         string ogsType = typeMap[type];
@@ -101,14 +101,22 @@ void createOGSProperty(pugi::xml_node& propertiesNode, pugi::xml_node& valuesNod
 void createOGSOutput(pugi::xml_node& outputsNode,
                     const std::string& name,
                     const std::string& type,
+                    const std::string& semantic,
                     StringMap& typeMap) 
 {
     if (!typeMap.count(type))
         return;
 
     string ogsType = typeMap[type];
+
     pugi::xml_node prop = outputsNode.append_child(ogsType.c_str());
     prop.append_attribute(XML_NAME_STRING.c_str()) = name.c_str();
+
+    const std::string OGS_SEMANTIC("semantic");
+    if (!semantic.empty())
+    {
+        prop.append_attribute(OGS_SEMANTIC.c_str()) = semantic.c_str();
+    }
 }
 
 // Based on the input uniform name get the OGS semantic to use
@@ -201,9 +209,12 @@ void OGSXMLFragmentWrapper::createWrapperFromNode(NodePtr node, std::vector<GenC
 
     // Scan outputs and create "outputs"
     pugi::xml_node xmlOutputs = xmlRoot.append_child("outputs");
+    // Note: We don't want to attach a CM semantic here since code
+    // generation should have added a transform already (i.e. mayaCMSemantic)
+    semantic.clear();
     for (auto output : node->getActiveOutputs())
     {
-        createOGSOutput(xmlOutputs, output->getName(), output->getType(), _typeMap);
+        createOGSOutput(xmlOutputs, output->getName(), output->getType(), semantic, _typeMap);
     }
 
     pugi::xml_node impls = xmlRoot.append_child("implementation");
@@ -263,8 +274,8 @@ void OGSXMLFragmentWrapper::createWrapperFromShader(NodePtr node, GenContext& co
     {
         return;
     }
-    const std::string& code = shader->getSourceCode();
-    if (code.empty())
+    const std::string& pixelShaderCode = shader->getSourceCode();
+    if (pixelShaderCode.empty())
     {
         return;
     }
@@ -322,30 +333,33 @@ void OGSXMLFragmentWrapper::createWrapperFromShader(NodePtr node, GenContext& co
     }
 
     // Set geometric inputs 
-    const ShaderStage& vs = shader->getStage(Stage::VERTEX);
-    const VariableBlock& vertexInputs = vs.getInputBlock(HW::VERTEX_INPUTS);
-    if (!vertexInputs.empty())
+    if (shader->hasStage(Stage::VERTEX))
     {
-        for (size_t i = 0; i < vertexInputs.size(); ++i)
+        const ShaderStage& vs = shader->getStage(Stage::VERTEX);
+        const VariableBlock& vertexInputs = vs.getInputBlock(HW::VERTEX_INPUTS);
+        if (!vertexInputs.empty())
         {
-            const ShaderPort* vertexInput = vertexInputs[i];
-            if (!vertexInput)
+            for (size_t i = 0; i < vertexInputs.size(); ++i)
             {
-                continue;
-            }
-            string name = vertexInput->getName();
-            if (name.empty())
-            {
-                continue;
-            }
-            ValuePtr valuePtr = vertexInput->getValue();
-            string value = valuePtr ? valuePtr->getValueString() : EMPTY_STRING;
-            string typeString = vertexInput->getType()->getName();
-            string semantic = vertexInput->getSemantic();
-            getStreamSemantic(name, semantic);
+                const ShaderPort* vertexInput = vertexInputs[i];
+                if (!vertexInput)
+                {
+                    continue;
+                }
+                string name = vertexInput->getName();
+                if (name.empty())
+                {
+                    continue;
+                }
+                ValuePtr valuePtr = vertexInput->getValue();
+                string value = valuePtr ? valuePtr->getValueString() : EMPTY_STRING;
+                string typeString = vertexInput->getType()->getName();
+                string semantic = vertexInput->getSemantic();
+                getStreamSemantic(name, semantic);
 
-            createOGSProperty(xmlProperties, xmlValues,
-                name, typeString, value, semantic, _typeMap);
+                createOGSProperty(xmlProperties, xmlValues,
+                    name, typeString, value, semantic, _typeMap);
+            }
         }
     }
 
@@ -364,7 +378,10 @@ void OGSXMLFragmentWrapper::createWrapperFromShader(NodePtr node, GenContext& co
             }
             string path = v->getPath();
             string typeString = v->getType()->getName();
-            createOGSOutput(xmlOutputs, name, typeString, _typeMap);
+            // Note: We don't want to attach a CM semantic here since code
+            // generation should have added a transform already (i.e. mayaCMSemantic)
+            string semantic = v->getSemantic();
+            createOGSOutput(xmlOutputs, name, typeString, semantic, _typeMap);
         }
     }
 
@@ -383,12 +400,22 @@ void OGSXMLFragmentWrapper::createWrapperFromShader(NodePtr node, GenContext& co
         // work for single nodes.
         func.append_attribute("val") = nodeDef->getName().c_str();
     }
-    pugi::xml_node source = impl.append_child("source");
+    if (_outputVertexShader)
+    {
+        const std::string& vertexShaderCode = shader->getSourceCode(Stage::VERTEX);
+        if (vertexShaderCode.empty())
+        {
+            pugi::xml_node vertexSource = impl.append_child("vertex_source");
+            vertexSource.append_child(pugi::node_cdata).set_value(vertexShaderCode.c_str());
+        }
+    }
+    pugi::xml_node pixelSource = impl.append_child("source");
     {
         // Works but is the incorrect code currently
-        //source.append_child(pugi::node_cdata).set_value(code.c_str());
-        source.append_child(pugi::node_cdata).set_value("// Code here");
+        pixelSource.append_child(pugi::node_cdata).set_value(pixelShaderCode.c_str());
     }
+
+
 
 }
 
