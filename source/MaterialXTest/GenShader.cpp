@@ -228,8 +228,9 @@ TEST_CASE("GenShader: Generate OGS fragment wrappers", "[genogsfrag]")
         contexts.push_back(oslContext);
 
         // TODO: We want 1 wrapper with both languages -- not 2 wrappers
-        mx::OGSXMLFragmentWrapper glslWrapper;
-        mx::OGSXMLFragmentWrapper oslWrapper;
+        mx::OGSXMLFragmentWrapper glslWrapper(glslContext);
+        glslWrapper.setOutputVertexShader(true);
+        mx::OGSXMLFragmentWrapper oslWrapper(oslContext);
 
         std::vector<mx::TypedElementPtr> renderables;
         mx::findRenderableElements(doc, renderables, false);
@@ -242,8 +243,8 @@ TEST_CASE("GenShader: Generate OGS fragment wrappers", "[genogsfrag]")
                 node = output->getConnectedNode();
                 if (node && !node->hasSourceUri())
                 {
-                    glslWrapper.createWrapperFromShader(node, *glslContext);
-                    oslWrapper.createWrapperFromShader(node, *oslContext);
+                    glslWrapper.createWrapper(node);
+                    oslWrapper.createWrapper(node);
                 }
             }
         }

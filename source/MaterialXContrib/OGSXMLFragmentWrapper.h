@@ -19,15 +19,13 @@ class OGSXMLFragmentWrapper
 {
   public:
     /// Default constructor
-    OGSXMLFragmentWrapper();
+    OGSXMLFragmentWrapper(GenContext* context);
 
     /// Default desctructor
     ~OGSXMLFragmentWrapper();
 
-    /// Add a fragment wrapper from a node definition
-    void createWrapperFromNode(NodePtr node, std::vector<GenContext*> contexts);
-    /// Add a fragment wrapper for a shader generated from a given node for a given context
-    void createWrapperFromShader(NodePtr node, GenContext& context);
+    /// Add a fragment wrapper for a shader generated from a given node
+    void createWrapper(NodePtr node);
 
     /// Get the contents of the cached XML document as a stream.
     void getDocument(std::ostream& stream);
@@ -70,6 +68,9 @@ class OGSXMLFragmentWrapper
 
     // Mapping from MTLX Element paths to fragment output names
     StringMap _pathOutputMap;
+
+    // Context for generating shaders
+    GenContext* _context;
 };
 
 } // namespace MaterialX
