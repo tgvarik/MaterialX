@@ -162,6 +162,12 @@ class ShaderGenerator
     virtual bool remapEnumeration(const ValueElement& input, const string& value,
                                   std::pair<const TypeDesc*, ValuePtr>& result) const;
 
+    /// Return any semantics associated with uniforms
+    virtual const StringMap* getSemanticMap() const
+    {
+        return nullptr;
+    }
+
   protected:
     /// Protected constructor
     ShaderGenerator(SyntaxPtr syntax);

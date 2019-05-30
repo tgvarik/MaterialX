@@ -93,10 +93,16 @@ void createOGSProperty(pugi::xml_node& propertiesNode, pugi::xml_node& valuesNod
 
     if (type == MTLX_FILENAME)
     {
+        // TODO: GLSL is not taking texture as an input argument, only a sampler
+        // so mark it as a global. Not for DirectX11 we need both but could still
+        // be a global.
         pugi::xml_node txt = propertiesNode.append_child(OGS_TEXTURE2.c_str());
-        txt.append_attribute(XML_NAME_STRING.c_str()) = name.c_str();
+        txt.append_attribute(XML_NAME_STRING.c_str()) = (name + "_texture").c_str();
+        txt.append_attribute(OGS_FLAGS.c_str()) = OGS_IS_REQUIREMENT_ONLY.c_str();
         pugi::xml_node samp = propertiesNode.append_child(OGS_SAMPLER.c_str());
-        samp.append_attribute(XML_NAME_STRING.c_str()) = (name + "_textureSampler").c_str();
+        samp.append_attribute(XML_NAME_STRING.c_str()) = (name).c_str();
+        // TODO: Temporary make this a global for now to match current code generation
+        samp.append_attribute(OGS_FLAGS.c_str()) = OGS_IS_REQUIREMENT_ONLY.c_str();
     }
     else
     {
@@ -106,15 +112,13 @@ void createOGSProperty(pugi::xml_node& propertiesNode, pugi::xml_node& valuesNod
 
         pugi::xml_node prop = propertiesNode.append_child(ogsType.c_str());
         prop.append_attribute(XML_NAME_STRING.c_str()) = name.c_str();
+        string flagValue = flags;
         if (!semantic.empty())
         {
             prop.append_attribute(OGS_SEMANTIC.c_str()) = semantic.c_str();
-            string flagValue = flags;
-            if (!flagValue.empty())
-            {
-                flagValue += ", ";
-            }
-            flagValue += "varyingInputParam";
+        }
+        if (!flagValue.empty())
+        {
             prop.append_attribute(OGS_FLAGS.c_str()) = flagValue.c_str();
         }
 
@@ -149,7 +153,7 @@ void createOGSOutput(pugi::xml_node& outputsNode,
 
 void getFlags(const ShaderPort* /*port*/, string& flags)
 {
-    bool isRequirement = false; // TODO: Determine how to set this
+    bool isRequirement = true; // TODO: Determine how to set this
     if (isRequirement)
     {
         flags = OGS_IS_REQUIREMENT_ONLY;
@@ -189,6 +193,51 @@ void getStreamSemantic(const string& name, string& semantic)
         semantic = OGS_COLORSET_SEMANTIC;
     }
 }
+}
+
+void OGSXMLFragmentWrapper::getVertexUniformSemantic(const string& name, string& semantic) const
+{
+/* This won't work as is not for GLSL since OGSFX has the string map
+    ShaderGenerator& generator = _context->getShaderGenerator();
+    const StringMap* semanticMap = generator.getSemanticMap();
+    if (semanticMap)
+    {
+        auto val = semanticMap->find(name);
+        if (val != semanticMap->end())
+        {
+            semantic = val->second;
+        }
+    }
+*/
+    const StringMap semanticMap  =
+    {
+        { "u_worldMatrix", "World" },
+        { "u_worldInverseMatrix", "WorldInverse" },
+        { "u_worldTransposeMatrix", "WorldTranspose" },
+        { "u_worldInverseTransposeMatrix", "WorldInverseTranspose" },
+
+        { "u_viewMatrix", "View" },
+        { "u_viewInverseMatrix", "ViewInverse" },
+        { "u_viewTransposeMatrix", "ViewTranspose" },
+        { "u_viewInverseTransposeMatrix", "ViewInverseTranspose" },
+
+        { "u_projectionMatrix", "Projection" },
+        { "u_projectionInverseMatrix", "ProjectionInverse" },
+        { "u_projectionTransposeMatrix", "ProjectionTranspose" },
+        { "u_projectionInverseTransposeMatrix", "ProjectionInverseTranspose" },
+
+        { "u_worldViewMatrix", "WorldView" },
+        { "u_viewProjectionMatrix", "ViewProjection" },
+        { "u_worldViewProjectionMatrix", "WorldViewProjection" },
+
+        { "u_viewDirection", "ViewDirection" },
+        { "u_viewPosition", "WorldCameraPosition" }
+    };
+    auto val = semanticMap.find(name);
+    if (val != semanticMap.end())
+    {
+        semantic = val->second;
+    }
 }
 
 #if 0 // TO DETERMINE IF STILL USEFUL
@@ -276,8 +325,8 @@ void OGSXMLFragmentWrapper::createWrapperFromNode(NodePtr node, std::vector<GenC
             }
             pugi::xml_node func = impl.append_child("function_name");
             {
-                // TODO: Figure out what is the proper functio nname to use
-                func.append_attribute("val") = nodeDef->getName().c_str();
+                // TODO: Figure out what is the proper function name to use
+                func.append_attribute("val") = "main";// nodeDef->getName().c_str();
             }
             pugi::xml_node source = impl.append_child("source");
             {
@@ -400,11 +449,47 @@ void OGSXMLFragmentWrapper::createWrapper(NodePtr node)
                 getStreamSemantic(name, semantic);
                 // TODO: For now we assume all vertex inputs are "global properties"
                 // and not part of the function argument list.
-                string flags = OGS_IS_REQUIREMENT_ONLY;
+                string flags;
                 getFlags(vertexInput, flags);
+                if (!flags.empty())
+                {
+                    flags += ", ";
+                }
+                flags += "varyingInputParam";
 
                 createOGSProperty(xmlProperties, xmlValues,
                     name, typeString, value, semantic, flags, _typeMap);
+            }
+
+            // Output vertex uniforms
+            if (_outputVertexShader)
+            {
+                const VariableBlock& uniformInputs = vs.getUniformBlock(HW::PRIVATE_UNIFORMS);
+                for (size_t i = 0; i < uniformInputs.size(); ++i)
+                {
+                    const ShaderPort* uniformInput = uniformInputs[i];
+                    if (!uniformInput)
+                    {
+                        continue;
+                    }
+                    string name = uniformInput->getName();
+                    if (name.empty())
+                    {
+                        continue;
+                    }
+                    ValuePtr valuePtr = uniformInput->getValue();
+                    string value = valuePtr ? valuePtr->getValueString() : EMPTY_STRING;
+                    string typeString = uniformInput->getType()->getName();
+                    string semantic = uniformInput->getSemantic();
+                    getVertexUniformSemantic(name, semantic);
+                    // TODO: For now we assume all vertex inputs are "global properties"
+                    // and not part of the function argument list.
+                    string flags = OGS_IS_REQUIREMENT_ONLY;
+
+                    createOGSProperty(xmlProperties, xmlValues,
+                        name, typeString, value, semantic, flags, _typeMap);
+
+                }               
             }
         }
     }
@@ -453,7 +538,7 @@ void OGSXMLFragmentWrapper::createWrapper(NodePtr node)
     {
         // This will need to change for graphs, but should
         // work for single nodes.
-        func.append_attribute("val") = nodeDef->getName().c_str();
+        func.append_attribute("val") = "main"; //  nodeDef->getName().c_str();
     }
     if (_outputVertexShader)
     {

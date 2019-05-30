@@ -509,4 +509,9 @@ void OgsFxShaderGenerator::getTechniqueParams(const Shader&, string&) const
     // Default implementation doesn't use any technique parameters
 }
 
+const StringMap* OgsFxShaderGenerator::getSemanticMap() const
+{
+    return &OGSFX_DEFAULT_SEMANTICS_MAP;
+}
+
 } // namespace MaterialX

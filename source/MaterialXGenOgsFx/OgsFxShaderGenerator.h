@@ -34,6 +34,8 @@ public:
     /// Unique identifyer for this generator target
     static const string TARGET;
 
+    const StringMap* getSemanticMap() const override;
+
 protected:
     void emitVertexStage(const ShaderGraph& graph, GenContext& context, ShaderStage& stage) const override;
     void emitPixelStage(const ShaderGraph& graph, GenContext& context, ShaderStage& stage) const override;

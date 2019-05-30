@@ -55,6 +55,8 @@ class OGSXMLFragmentWrapper
     }
 
   protected:
+    void getVertexUniformSemantic(const string& name, string& semantic) const;
+
     // Mapping from MTLX keywords to OGS fragment XML keywords
     StringMap _typeMap;
 
