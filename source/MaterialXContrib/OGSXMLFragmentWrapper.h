@@ -48,12 +48,6 @@ class OGSXMLFragmentWrapper
         return _pathInputMap;
     }
 
-    /// Get list of Element paths and corresponding fragment output names
-    const StringMap& getPathOutputMap() const
-    {
-        return _pathOutputMap;
-    }
-
   protected:
     void getVertexUniformSemantic(const string& name, string& semantic) const;
 
@@ -67,9 +61,6 @@ class OGSXMLFragmentWrapper
 
     // Mapping from MTLX Element paths to fragment input names
     StringMap _pathInputMap;
-
-    // Mapping from MTLX Element paths to fragment output names
-    StringMap _pathOutputMap;
 
     // Context for generating shaders
     GenContext* _context;

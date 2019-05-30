@@ -340,7 +340,6 @@ void OGSXMLFragmentWrapper::createWrapperFromNode(NodePtr node, std::vector<GenC
 void OGSXMLFragmentWrapper::createWrapper(NodePtr node)
 {
     _pathInputMap.clear();
-    _pathOutputMap.clear();
 
     NodeDefPtr nodeDef = node->getNodeDef();
     if (!nodeDef)
@@ -513,8 +512,6 @@ void OGSXMLFragmentWrapper::createWrapper(NodePtr node)
             // generation should have added a transform already (i.e. mayaCMSemantic)
             string semantic = v->getSemantic();
             createOGSOutput(xmlOutputs, name, typeString, semantic, _typeMap);
-
-            _pathOutputMap[path] = name;
         }
     }
 

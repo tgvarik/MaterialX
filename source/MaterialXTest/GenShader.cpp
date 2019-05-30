@@ -214,13 +214,15 @@ TEST_CASE("GenShader: Generate OGS fragment wrappers", "[genogsfrag]")
         mx::DocumentPtr doc = mx::createDocument();
         mx::FilePath searchPath = mx::FilePath::getCurrentPath() / mx::FilePath("libraries");
         GenShaderUtil::loadLibraries({ "stdlib" }, searchPath, doc, nullptr);
-        //mx::readFromXmlFile(doc, "resources/Materials/TestSuite/stdlib/geometric/streams.mtlx");
-        mx::readFromXmlFile(doc, "resources/Materials/TestSuite/stdlib/texture/tiledimage.mtlx");
+        mx::readFromXmlFile(doc, "resources/Materials/TestSuite/stdlib/geometric/streams.mtlx");
+        //mx::readFromXmlFile(doc, "resources/Materials/TestSuite/stdlib/texture/tiledimage.mtlx");
 
         std::vector<mx::GenContext*> contexts;
         mx::GenContext* glslContext = new mx::GenContext(mx::GlslShaderGenerator::create());
         // Stop emission of environment map lookups.
         glslContext->getOptions().hwSpecularEnvironmentMethod = mx::SPECULAR_ENVIRONMENT_NONE;
+        // Stop emitting version strings
+        glslContext->getOptions().emitVersionString = false;
         glslContext->registerSourceCodeSearchPath(searchPath);
         contexts.push_back(glslContext);
         mx::GenContext* oslContext = new mx::GenContext(mx::OslShaderGenerator::create());
@@ -256,11 +258,6 @@ TEST_CASE("GenShader: Generate OGS fragment wrappers", "[genogsfrag]")
         for (auto i : inputs)
         {
             std::cout << "Element: " << i.first << " maps to fragment input: " << i.second << std::endl;
-        }
-        const mx::StringMap& outputs = glslWrapper.getPathOutputMap();
-        for (auto o : outputs)
-        {
-            std::cout << "Element: " << o.first << " maps to fragment output: " << o.second << std::endl;
         }
 
         std::ofstream oslStream("oslOGSXMLFragmentDump.xml");
