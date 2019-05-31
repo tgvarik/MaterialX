@@ -24,6 +24,8 @@ class CreateMaterialXNodeCmd : MPxCommand
 	static MSyntax newSyntax();
 	static void* creator();
 
+    static MString NAME;
+
   private:
 	bool validOutputSpecified(MaterialX::DocumentPtr doc, const std::string &elementPath);
 	void setAttributeValue(MObject &materialXObject, MObject &attr, const float* values, unsigned int size);

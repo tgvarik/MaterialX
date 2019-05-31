@@ -14,10 +14,17 @@ class MaterialXNode : public MPxNode
 	static MStatus initialize();
 	MTypeId	typeId() const override;
 
-	static const MTypeId s_typeId;
-	static const MString s_typeName;
-	static MObject s_materialXDocument;
-	static MObject s_materialXElement;
+	static const MTypeId MATERIALX_NODE_TYPEID;
+	static const MString MATERIALX_NODE_TYPENAME;
+
+    /// Attribute holding a MaterialX document
+    static MString DOCUMENT_ATTRIBUTE_LONG_NAME;
+    static MString DOCUMENT_ATTRIBUTE_SHORT_NAME;
+	static MObject DOCUMENT_ATTRIBUTE;
+    /// Attribute holding a MaterialX element name
+    static MString ELEMENT_ATTRIBUTE_LONG_NAME;
+    static MString ELEMENT_ATTRIBUTE_SHORT_NAME;
+    static MObject ELEMENT_ATTRIBUTE;
 
 };
 

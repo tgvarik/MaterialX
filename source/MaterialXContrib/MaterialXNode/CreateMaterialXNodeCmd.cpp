@@ -25,6 +25,8 @@
 #define kElementFlag       "e"
 #define kElementFlagLong   "element"
 
+MString CreateMaterialXNodeCmd::NAME("CreateMaterialXNode");
+
 CreateMaterialXNodeCmd::CreateMaterialXNodeCmd()
 {
 }
@@ -73,7 +75,7 @@ MStatus CreateMaterialXNodeCmd::doIt( const MArgList &args )
 		}
 
 		// Create the MaterialX node
-		MObject node = _dgModifier.createNode(MaterialXNode::s_typeId);
+		MObject node = _dgModifier.createNode(MaterialXNode::MATERIALX_NODE_TYPEID);
 
 		// Generate a valid Maya node name from the path string
 		std::string nodeName = elementName.asChar();
@@ -81,10 +83,10 @@ MStatus CreateMaterialXNodeCmd::doIt( const MArgList &args )
 		_dgModifier.renameNode(node, nodeName.c_str());
 
 		std::string documentString = MaterialX::writeToXmlString(doc);
-		MPlug materialXPlug(node, MaterialXNode::s_materialXDocument);
+		MPlug materialXPlug(node, MaterialXNode::DOCUMENT_ATTRIBUTE);
 		_dgModifier.newPlugValueString(materialXPlug, documentString.c_str());
 
-		MPlug elementPlug(node, MaterialXNode::s_materialXElement);
+		MPlug elementPlug(node, MaterialXNode::ELEMENT_ATTRIBUTE);
 		_dgModifier.newPlugValueString(elementPlug, elementName);
 
 		_dgModifier.doIt();

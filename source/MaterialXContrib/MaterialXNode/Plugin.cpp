@@ -28,14 +28,14 @@ MStatus initializePlugin(MObject obj)
 	Plugin::instance().initialize(plugin.loadPath().asChar());
 
 	CHECK_MSTATUS(plugin.registerCommand(
-		"createMaterialXNode",
+        CreateMaterialXNodeCmd::NAME,
 		CreateMaterialXNodeCmd::creator,
 		CreateMaterialXNodeCmd::newSyntax));
 
 	const MString materialXNodeClassification("texture/2d:drawdb/shader/texture/2d/materialXNode");
 	CHECK_MSTATUS(plugin.registerNode(
-		MaterialXNode::s_typeName,
-		MaterialXNode::s_typeId,
+		MaterialXNode::MATERIALX_NODE_TYPENAME,
+		MaterialXNode::MATERIALX_NODE_TYPEID,
 		MaterialXNode::creator,
 		MaterialXNode::initialize,
 		MPxNode::kDependNode,
@@ -49,9 +49,9 @@ MStatus uninitializePlugin(MObject obj)
 	MFnPlugin plugin(obj);
 	MStatus status;
 
-	CHECK_MSTATUS(plugin.deregisterNode(MaterialXNode::s_typeId));
+	CHECK_MSTATUS(plugin.deregisterNode(MaterialXNode::MATERIALX_NODE_TYPEID));
 
-	CHECK_MSTATUS(plugin.deregisterCommand("createMaterialXNode"));
+	CHECK_MSTATUS(plugin.deregisterCommand(CreateMaterialXNodeCmd::NAME));
 
 	return MS::kSuccess;
 }
