@@ -71,7 +71,7 @@ if (EXISTS "${MAYA_DEBUG_DIR}" OR EXISTS "${MAYA_RELEASE_DIR}")
 
     file(GLOB _scripts "${CMAKE_CURRENT_SOURCE_DIR}/scripts/*.mel")
     file(GLOB _mods "${CMAKE_CURRENT_SOURCE_DIR}/mods/*.mod")
-    file(GLOB _resources "${CMAKE_CURRENT_SOURCE_DIR}/resources/*.xml")
+    file(GLOB _resources "${CMAKE_CURRENT_SOURCE_DIR}/resources/*.*")
 
     source_group("Header Files" FILES ${_headers})
     source_group("Source Files" FILES ${_source})
