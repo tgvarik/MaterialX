@@ -15,7 +15,7 @@ class Plugin
 
 	MaterialX::FilePath getLibrarySearchPath() const
 	{
-		return m_librarySearchPath;
+		return _librarySearchPath;
 	}
 
   private:
@@ -23,7 +23,7 @@ class Plugin
 	{
 	}
 
-	std::string m_librarySearchPath;
+	std::string _librarySearchPath;
 };
 
 #endif /* PLUGIN_H */

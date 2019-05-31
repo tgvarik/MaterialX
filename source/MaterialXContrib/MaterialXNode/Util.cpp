@@ -1,8 +1,10 @@
-#include "Utils.h"
+#include "Util.h"
 
 #include <MaterialXCore/Traversal.h>
 #include <MaterialXFormat/XmlIo.h>
 
+namespace MaterialX
+{
 void getInputs(MaterialX::OutputPtr output, std::vector<MaterialX::ValueElementPtr> &results)
 {
 	// TODO: Not all upstream element unconnected inputs are published inputs in a nodegraph, so we should prune the resulting list accordingly.
@@ -54,3 +56,6 @@ void loadLibraries(const MaterialX::StringVec& libraryNames,
 		}
 	}
 }
+
+} // namespace MAYA_MATERIALX_UTILS
+

@@ -1,5 +1,5 @@
-#ifndef MATERIALXNODECMD_H
-#define MATERIALXNODECMD_H
+#ifndef CREATE_MATERIALX_NODE_CMD_H
+#define CREATE_MATERIALX_NODE_CMD_H
 
 #include <maya/MPxCommand.h>
 #include <maya/MDGModifier.h>
@@ -9,6 +9,9 @@
 
 #include <vector>
 
+///
+///
+///
 class CreateMaterialXNodeCmd : MPxCommand
 {
   public:
@@ -22,13 +25,13 @@ class CreateMaterialXNodeCmd : MPxCommand
 	static void* creator();
 
   private:
-	bool validOutputSpecified(MaterialX::DocumentPtr doc, const std::string &targetOutputPath);
+	bool validOutputSpecified(MaterialX::DocumentPtr doc, const std::string &elementPath);
 	void setAttributeValue(MObject &materialXObject, MObject &attr, const float* values, unsigned int size);
 	void setAttributeValue(MObject &materialXObject, MObject &attr, const std::string& stringValue);
 	void createAttribute(MObject &materialXObject, const std::string& name, const MaterialX::UIPropertyItem& propertyItem);
 	void createAttributes(MObject &materialXObject, const MaterialX::UIPropertyGroup& groups, const MaterialX::UIPropertyGroup& unnamedGroups);
 
-	MDGModifier m_dgMod;
+	MDGModifier _dgModifier;
 };
 
-#endif /* MATERIALX_NODE_CMD_H */
+#endif /* CREATE_MATERIALX_NODE_CMD_H */

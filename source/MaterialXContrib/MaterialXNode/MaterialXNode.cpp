@@ -11,8 +11,8 @@
 
 const MTypeId MaterialXNode::s_typeId(0x00042402);
 const MString MaterialXNode::s_typeName("MaterialXNode");
-MObject MaterialXNode::s_materialXAttr;
-MObject MaterialXNode::s_targetAttr;
+MObject MaterialXNode::s_materialXDocument;
+MObject MaterialXNode::s_materialXElement;
 
 MaterialXNode::MaterialXNode()
 {
@@ -33,21 +33,19 @@ MStatus MaterialXNode::initialize()
 	MFnStringData stringData;
 
 	MObject theString = stringData.create();
-	s_materialXAttr = typedAttr.create("materialXDocument", "mxd", MFnData::kString, theString);
-
+	s_materialXDocument = typedAttr.create("materialXDocument", "mtlx", MFnData::kString, theString);
 	CHECK_MSTATUS(typedAttr.setStorable(true));
 	CHECK_MSTATUS(typedAttr.setReadable(true));
-	CHECK_MSTATUS(typedAttr.setWritable(true));
-	CHECK_MSTATUS(addAttribute(s_materialXAttr));
+    CHECK_MSTATUS(typedAttr.setHidden(true));
+	CHECK_MSTATUS(addAttribute(s_materialXDocument));
 
-	s_targetAttr = typedAttr.create("target", "tar", MFnData::kString, theString);
-
+	s_materialXElement = typedAttr.create("target", "tar", MFnData::kString, theString);
 	CHECK_MSTATUS(typedAttr.setStorable(true));
-	CHECK_MSTATUS(typedAttr.setReadable(true));
-	CHECK_MSTATUS(typedAttr.setWritable(true));
+    CHECK_MSTATUS(typedAttr.setHidden(true));
+    CHECK_MSTATUS(typedAttr.setReadable(true));
 
-	CHECK_MSTATUS(addAttribute(s_materialXAttr));
-	CHECK_MSTATUS(addAttribute(s_targetAttr));
+	CHECK_MSTATUS(addAttribute(s_materialXDocument));
+	CHECK_MSTATUS(addAttribute(s_materialXElement));
 
 	return MS::kSuccess;
 }

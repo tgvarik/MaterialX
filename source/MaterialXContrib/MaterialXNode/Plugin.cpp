@@ -17,7 +17,7 @@ Plugin& Plugin::instance()
 void Plugin::initialize(const std::string& loadPath)
 {
 	MaterialX::FilePath searchPath(loadPath);
-	m_librarySearchPath = searchPath / MaterialX::FilePath("../../libraries");
+	_librarySearchPath = searchPath / MaterialX::FilePath("../../libraries");
 }
 
 // Plugin configuration

@@ -16,8 +16,8 @@ class MaterialXNode : public MPxNode
 
 	static const MTypeId s_typeId;
 	static const MString s_typeName;
-	static MObject s_materialXAttr;
-	static MObject s_targetAttr;
+	static MObject s_materialXDocument;
+	static MObject s_materialXElement;
 
 };
 

@@ -5,12 +5,15 @@
 #include <MaterialXCore/Interface.h>
 #include <MaterialXFormat/File.h>
 
+namespace MaterialX
+{
 void getInputs(MaterialX::OutputPtr output, std::vector<MaterialX::ValueElementPtr> &results);
 void loadLibrary(const MaterialX::FilePath& file, MaterialX::DocumentPtr doc);
 void loadLibraries(
-	const MaterialX::StringVec& libraryNames,
-	const MaterialX::FilePath& searchPath,
-	MaterialX::DocumentPtr doc,
-	const MaterialX::StringSet* excludeFiles = nullptr);
+    const MaterialX::StringVec& libraryNames,
+    const MaterialX::FilePath& searchPath,
+    MaterialX::DocumentPtr doc,
+    const MaterialX::StringSet* excludeFiles = nullptr);
+}
 
 #endif /* UTILS_H */
