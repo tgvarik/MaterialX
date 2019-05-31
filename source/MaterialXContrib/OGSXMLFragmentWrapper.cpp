@@ -50,37 +50,57 @@ OGSXMLFragmentWrapper::~OGSXMLFragmentWrapper()
 
 namespace
 { 
+// XML constant strings
 const string XML_TAB_STRING("  ");
-
 const string XML_NAME_STRING("name");
 const string XML_VALUE_STRING("value");
 
-const string MTLX_POSITION("i_position");
-const string MTX_COLORSET("i_color_");
-const string MTLX_UVSET("i_texcoord_");
-const string MTLX_NORMAL("i_normal");
-const string MTLX_TANGENT("i_tangent");
-const string MTLX_BITANGENT("i_bitangent");
+// MaterialX constant strings
+const string MTLX_GENHW_POSITION("i_position");
+const string MTLX_GENHW_COLORSET("i_color_");
+const string MTLX_GENHW_UVSET("i_texcoord_");
+const string MTLX_GENHW_NORMAL("i_normal");
+const string MTLX_GENHW_TANGENT("i_tangent");
+const string MTLX_GENHW_BITANGENT("i_bitangent");
+const string MTLX_GENSHADER_FILENAME("filename");
 
+// OGS constant strings
 const string OGS_FRAGMENT("fragment");
-const string OGS_PLUMBING("plumbing");
-const string OGS_SHADERFRAGMENT("ShadeFragment");
+const string OGS_FRAGMENT_NAME("name");
+const string OGS_FRAGMENT_TYPE("type");
+const string OGS_FRAGMENT_CLASS("class");
+const string OGS_FRAGMENT_VERSION("version");
+const string OGS_FRAGMENT_TYPE_PLUMBING("plumbing");
+const string OGS_FRAGMENT_CLASS_SHADERFRAGMENT("ShadeFragment");
 const string OGS_PROPERTIES("properties");
+const string OGS_GLOBAL_PROPERTY("isRequirementOnly");
 const string OGS_VALUES("values");
+const string OGS_OUTPUTS("outputs");
+const string OGS_IMPLEMENTATION("implementation");
+const string OGS_RENDER("render");
+const string OGS_MAYA_RENDER("OGSRenderer"); // Name of the Maya renderer
+const string OGS_LANGUAGE("language");
+const string OGS_LANGUAGE_VERSION("lang_version");
+const string OGS_GLSL_LANGUAGE("GLSL");
+const string OGS_GLSL_LANGUAGE_VERSION("3.0");
+const string OGS_FUNCTION_NAME("function_name");
+const string OGS_FUNCTION_VAL("val");
+const string OGS_SOURCE("source");
+const string OGS_VERTEX_SOURCE("vertex_source");
 // TODO: Texture and sampler strings need to be per language mappings 
 const string OGS_TEXTURE2("texture2");
 const string OGS_SAMPLER("sampler");
 const string OGS_SEMANTIC("semantic");
 const string OGS_FLAGS("flags");
+const string OGS_VARYING_INPUT_PARAM("varyingInputParam");
 const string OGS_POSITION_WORLD_SEMANTIC("Pw");
 const string OGS_POSITION_OBJECT_SEMANTIC("Pm");
 const string OGS_NORMAL_WORLD_SEMANTIC("Nw");
 const string OGS_NORMAL_OBJECT_SEMANTIC("Nm");
 const string OGS_COLORSET_SEMANTIC("colorset");
-const string OGS_MAYA_BITANGENT_SEMANTIC("mayaBitangentIn");
-const string OGS_MAYA_TANGENT_SEMANTIC("mayaTangentIn");
-const string OGS_MAYA_UV_COORD_SEMANTIC("mayaUvCoordSemantic"); 
-const string OGS_IS_REQUIREMENT_ONLY("isRequirementOnly");
+const string OGS_MAYA_BITANGENT_SEMANTIC("mayaBitangentIn"); // Maya bitangent semantic
+const string OGS_MAYA_TANGENT_SEMANTIC("mayaTangentIn"); // Maya tangent semantic
+const string OGS_MAYA_UV_COORD_SEMANTIC("mayaUvCoordSemantic");  // Maya uv semantic
 
 void createOGSProperty(pugi::xml_node& propertiesNode, pugi::xml_node& valuesNode,
                                             const string& name,
@@ -91,20 +111,18 @@ void createOGSProperty(pugi::xml_node& propertiesNode, pugi::xml_node& valuesNod
                                             StringMap& typeMap)
 {
     // Special case filename
-    const string MTLX_FILENAME("filename");
-
-    if (type == MTLX_FILENAME)
+    if (type == MTLX_GENSHADER_FILENAME)
     {
         // TODO: GLSL is not taking texture as an input argument, only a sampler
         // so mark it as a global. Not for DirectX11 we need both but could still
         // be a global.
         pugi::xml_node txt = propertiesNode.append_child(OGS_TEXTURE2.c_str());
         txt.append_attribute(XML_NAME_STRING.c_str()) = (name + "_texture").c_str();
-        txt.append_attribute(OGS_FLAGS.c_str()) = OGS_IS_REQUIREMENT_ONLY.c_str();
+        txt.append_attribute(OGS_FLAGS.c_str()) = OGS_GLOBAL_PROPERTY.c_str();
         pugi::xml_node samp = propertiesNode.append_child(OGS_SAMPLER.c_str());
         samp.append_attribute(XML_NAME_STRING.c_str()) = (name).c_str();
         // TODO: Temporary make this a global for now to match current code generation
-        samp.append_attribute(OGS_FLAGS.c_str()) = OGS_IS_REQUIREMENT_ONLY.c_str();
+        samp.append_attribute(OGS_FLAGS.c_str()) = OGS_GLOBAL_PROPERTY.c_str();
     }
     else
     {
@@ -153,12 +171,14 @@ void createOGSOutput(pugi::xml_node& outputsNode,
     }
 }
 
-void getFlags(const ShaderPort* /*port*/, string& flags)
+void getFlags(const ShaderPort* /*port*/, const string& language, string& flags)
 {
-    bool isRequirement = true; // TODO: Determine how to set this
+    // TODO: Determine how to tell if this is global or a signature argument?
+    // For now just use language as OSL code has no globals
+    bool isRequirement = (language == "genglsl");
     if (isRequirement)
     {
-        flags = OGS_IS_REQUIREMENT_ONLY;
+        flags = OGS_GLOBAL_PROPERTY;
     }
 }
 
@@ -166,31 +186,31 @@ void getFlags(const ShaderPort* /*port*/, string& flags)
 // for auto-binding.
 void getStreamSemantic(const string& name, string& semantic)
 {
-    if (name.find(MTLX_POSITION) != string::npos)
+    if (name.find(MTLX_GENHW_POSITION) != string::npos)
     {
         // TODO: Determine how to tell if object / model space is required
         semantic = OGS_POSITION_WORLD_SEMANTIC;
     }
-    else if (name.find(MTLX_UVSET) != string::npos)
+    else if (name.find(MTLX_GENHW_UVSET) != string::npos)
     {
         semantic = OGS_MAYA_UV_COORD_SEMANTIC;
     }
-    else if (name.find(MTLX_NORMAL) != string::npos)
+    else if (name.find(MTLX_GENHW_NORMAL) != string::npos)
     {
         // TODO: Determine how to tell if object / model space is required
         semantic = OGS_NORMAL_WORLD_SEMANTIC;
     }
-    else if (name.find(MTLX_TANGENT) != string::npos)
+    else if (name.find(MTLX_GENHW_TANGENT) != string::npos)
     {
         // TODO: Determine how to tell if object / model space is required
         semantic = OGS_MAYA_TANGENT_SEMANTIC;
     }
-    else if (name.find(MTLX_BITANGENT) != string::npos)
+    else if (name.find(MTLX_GENHW_BITANGENT) != string::npos)
     {
         // TODO: Determine how to tell if object / model space is required
         semantic = OGS_MAYA_BITANGENT_SEMANTIC;
     }
-    else if (name.find(MTX_COLORSET) != string::npos)
+    else if (name.find(MTLX_GENHW_COLORSET) != string::npos)
     {
         semantic = OGS_COLORSET_SEMANTIC;
     }
@@ -254,10 +274,10 @@ void OGSXMLFragmentWrapper::createWrapperFromNode(NodePtr node, std::vector<GenC
     const string OGS_VERSION_STRING(node->getDocument()->getVersionString());
 
     pugi::xml_node xmlRoot = static_cast<pugi::xml_document*>(_xmlDocument)->append_child(OGS_FRAGMENT.c_str());
-    xmlRoot.append_attribute("name") = node->getName().c_str();
-    xmlRoot.append_attribute("type") = OGS_PLUMBING.c_str();
-    xmlRoot.append_attribute("class") = OGS_SHADERFRAGMENT.c_str();
-    xmlRoot.append_attribute("version") = OGS_VERSION_STRING.c_str();
+    xmlRoot.append_attribute(OGS_FRAGMENT_NAME.c_str()) = node->getName().c_str();
+    xmlRoot.append_attribute(OGS_FRAGMENT_TYPE.c_str()) = OGS_FRAGMENT_TYPE_PLUMBING.c_str();
+    xmlRoot.append_attribute(OGS_FRAGMENT_CLASS.c_str()) = OGS_FRAGMENT_CLASS_SHADERFRAGMENT.c_str();
+    xmlRoot.append_attribute(OGS_FRAGMENT_VERSION.c_str()) = OGS_VERSION_STRING.c_str();
 
     // Scan inputs and parameters and create "properties" and 
     // "values" children from the nodeDef
@@ -295,7 +315,7 @@ void OGSXMLFragmentWrapper::createWrapperFromNode(NodePtr node, std::vector<GenC
     }
 
     // Scan outputs and create "outputs"
-    pugi::xml_node xmlOutputs = xmlRoot.append_child("outputs");
+    pugi::xml_node xmlOutputs = xmlRoot.append_child(OGS_OUTPUTS.c_str());
     // Note: We don't want to attach a CM semantic here since code
     // generation should have added a transform already (i.e. mayaCMSemantic)
     semantic.clear();
@@ -304,7 +324,7 @@ void OGSXMLFragmentWrapper::createWrapperFromNode(NodePtr node, std::vector<GenC
         createOGSOutput(xmlOutputs, output->getName(), output->getType(), semantic, _typeMap);
     }
 
-    pugi::xml_node impls = xmlRoot.append_child("implementation");
+    pugi::xml_node impls = xmlRoot.append_child(OGS_IMPLEMENTATION.c_str());
 
     string shaderName(node->getName());
     // Work-around: Need to get a node which can be sampled. Should not be required.
@@ -328,18 +348,17 @@ void OGSXMLFragmentWrapper::createWrapperFromNode(NodePtr node, std::vector<GenC
             const string& code = shader->getSourceCode();
 
             // Need to get the actual code via shader generation.
-            pugi::xml_node impl = impls.append_child("implementation");
+            pugi::xml_node impl = impls.append_child(OGS_IMPLEMENTATION.c_str());
             {
-                impl.append_attribute("render") = "OGSRenderer";
-                impl.append_attribute("language") = generator.getLanguage().c_str();
-                impl.append_attribute("lang_version") = generator.getTarget().c_str();
+                impl.append_attribute(OGS_RENDER) = OGS_MAYA_RENDER.c_str();
+                impl.append_attribute(OGS_LANGUAGE.c_str()) = generator.getLanguage().c_str();
+                impl.append_attribute(OGS_LANGUAGE_VERSION.c_str()) = generator.getTarget().c_str();
             }
-            pugi::xml_node func = impl.append_child("function_name");
+            pugi::xml_node func = impl.append_child(OGS_FUNCTION_NAME.c_str());
             {
-                // TODO: Figure out what is the proper function name to use
-                func.append_attribute("val") = "main";// nodeDef->getName().c_str();
+                func.append_attribute(OGS_FUNCTION_VAL.c_str()) = nodeDef->getName().c_str();
             }
-            pugi::xml_node source = impl.append_child("source");
+            pugi::xml_node source = impl.append_child(OGS_SOURCE.c_str());
             {
                 source.append_child(pugi::node_cdata).set_value(code.c_str());
             }
@@ -377,10 +396,10 @@ void OGSXMLFragmentWrapper::createWrapper(ElementPtr element)
     const string OGS_VERSION_STRING(element->getDocument()->getVersionString());
 
     pugi::xml_node xmlRoot = static_cast<pugi::xml_document*>(_xmlDocument)->append_child(OGS_FRAGMENT.c_str());
-    xmlRoot.append_attribute("name") = element->getName().c_str();
-    xmlRoot.append_attribute("type") = OGS_PLUMBING.c_str();
-    xmlRoot.append_attribute("class") = OGS_SHADERFRAGMENT.c_str();
-    xmlRoot.append_attribute("version") = OGS_VERSION_STRING.c_str();
+    xmlRoot.append_attribute(OGS_FRAGMENT_NAME.c_str()) = element->getName().c_str();
+    xmlRoot.append_attribute(OGS_FRAGMENT_TYPE.c_str()) = OGS_FRAGMENT_TYPE_PLUMBING.c_str();
+    xmlRoot.append_attribute(OGS_FRAGMENT_CLASS.c_str()) = OGS_FRAGMENT_CLASS_SHADERFRAGMENT.c_str();
+    xmlRoot.append_attribute(OGS_FRAGMENT_VERSION.c_str()) = OGS_VERSION_STRING.c_str();
 
     // Scan uniform inputs and create "properties" and "values" children.
     pugi::xml_node xmlProperties = xmlRoot.append_child(OGS_PROPERTIES.c_str());
@@ -416,7 +435,7 @@ void OGSXMLFragmentWrapper::createWrapper(ElementPtr element)
             string semantic = uniform->getSemantic();
             string variable = uniform->getVariable();
             string flags;
-            getFlags(uniform, flags);
+            getFlags(uniform, generator.getLanguage(), flags);
 
             createOGSProperty(xmlProperties, xmlValues,
                 name, typeString, value, semantic, flags, _typeMap);
@@ -455,12 +474,12 @@ void OGSXMLFragmentWrapper::createWrapper(ElementPtr element)
                 // TODO: For now we assume all vertex inputs are "global properties"
                 // and not part of the function argument list.
                 string flags;
-                getFlags(vertexInput, flags);
+                getFlags(vertexInput, generator.getLanguage(), flags);
                 if (!flags.empty())
                 {
                     flags += ", ";
                 }
-                flags += "varyingInputParam";
+                flags += OGS_VARYING_INPUT_PARAM.c_str();
 
                 createOGSProperty(xmlProperties, xmlValues,
                     name, typeString, value, semantic, flags, _typeMap);
@@ -489,7 +508,7 @@ void OGSXMLFragmentWrapper::createWrapper(ElementPtr element)
                     getVertexUniformSemantic(name, semantic);
                     // TODO: For now we assume all vertex inputs are "global properties"
                     // and not part of the function argument list.
-                    string flags = OGS_IS_REQUIREMENT_ONLY;
+                    string flags = OGS_GLOBAL_PROPERTY;
 
                     createOGSProperty(xmlProperties, xmlValues,
                         name, typeString, value, semantic, flags, _typeMap);
@@ -500,7 +519,7 @@ void OGSXMLFragmentWrapper::createWrapper(ElementPtr element)
     }
 
     // Scan outputs and create "outputs"
-    pugi::xml_node xmlOutputs = xmlRoot.append_child("outputs");
+    pugi::xml_node xmlOutputs = xmlRoot.append_child(OGS_OUTPUTS.c_str());
     for (auto uniformsIt : ps.getOutputBlocks())
     {
         const VariableBlock& uniforms = *uniformsIt.second;
@@ -521,38 +540,37 @@ void OGSXMLFragmentWrapper::createWrapper(ElementPtr element)
         }
     }
 
-    pugi::xml_node impls = xmlRoot.append_child("implementation");
+    pugi::xml_node impls = xmlRoot.append_child(OGS_IMPLEMENTATION.c_str());
 
     // Need to get the actual code via shader generation.
-    pugi::xml_node impl = impls.append_child("implementation");
+    pugi::xml_node impl = impls.append_child(OGS_IMPLEMENTATION.c_str());
     {
-        impl.append_attribute("render") = "OGSRenderer";
+        impl.append_attribute(OGS_RENDER.c_str()) = OGS_MAYA_RENDER.c_str();
         string language = generator.getLanguage();
         string language_version = generator.getTarget(); // This isn't really the version
         if (language == "genglsl")
         {
-            language = "GLSL";
-            language_version = "4.0";
+            // The language capabilities in OGS are fixed so map to what is available.
+            language = OGS_GLSL_LANGUAGE;
+            language_version = OGS_GLSL_LANGUAGE_VERSION;
         }
-        impl.append_attribute("language") = language.c_str();
-        impl.append_attribute("lang_version") = language_version.c_str();
+        impl.append_attribute(OGS_LANGUAGE.c_str()) = language.c_str();
+        impl.append_attribute(OGS_LANGUAGE_VERSION.c_str()) = language_version.c_str();
     }
-    pugi::xml_node func = impl.append_child("function_name");
+    pugi::xml_node func = impl.append_child(OGS_FUNCTION_NAME.c_str());
     {
-        // This will need to change for graphs, but should
-        // work for single nodes.
-        func.append_attribute("val") = "main"; //  nodeDef->getName().c_str();
+        func.append_attribute(OGS_FUNCTION_VAL.c_str()) = ps.getSignature().c_str();
     }
     if (_outputVertexShader)
     {
         const string& vertexShaderCode = shader->getSourceCode(Stage::VERTEX);
         if (!vertexShaderCode.empty())
         {
-            pugi::xml_node vertexSource = impl.append_child("vertex_source");
+            pugi::xml_node vertexSource = impl.append_child(OGS_VERTEX_SOURCE.c_str());
             vertexSource.append_child(pugi::node_cdata).set_value(vertexShaderCode.c_str());
         }
     }
-    pugi::xml_node pixelSource = impl.append_child("source");
+    pugi::xml_node pixelSource = impl.append_child(OGS_SOURCE.c_str());
     {
         // Works but is the incorrect code currently
         pixelSource.append_child(pugi::node_cdata).set_value(pixelShaderCode.c_str());
