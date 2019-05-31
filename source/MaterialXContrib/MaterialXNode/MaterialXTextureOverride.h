@@ -23,7 +23,7 @@ class MaterialXTextureOverride : public MHWRender::MPxShadingNodeOverride
   private:
 	MaterialXTextureOverride(const MObject& obj);
 
-	MString _materialXDocument;
+	MString _document;
 	MString _element;
 	MObject _object;
 };

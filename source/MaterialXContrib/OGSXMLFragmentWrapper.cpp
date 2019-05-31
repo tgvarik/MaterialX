@@ -50,6 +50,8 @@ OGSXMLFragmentWrapper::~OGSXMLFragmentWrapper()
 
 namespace
 { 
+const string XML_TAB_STRING("  ");
+
 const string XML_NAME_STRING("name");
 const string XML_VALUE_STRING("value");
 
@@ -559,7 +561,19 @@ void OGSXMLFragmentWrapper::createWrapper(ElementPtr element)
 
 void OGSXMLFragmentWrapper::getDocument(std::ostream& stream)
 {
-    static_cast<pugi::xml_document*>(_xmlDocument)->save(stream, "  ");
+    static_cast<pugi::xml_document*>(_xmlDocument)->save(stream, XML_TAB_STRING.c_str());
 }
+
+void OGSXMLFragmentWrapper::readDocument(std::istream& istream, std::ostream& ostream)
+{
+    pugi::xml_document document;
+    pugi::xml_parse_result result = document.load(istream);
+    if (!result)
+    {
+        throw ExceptionParseError("Error parsing input XML stream");
+    }
+    document.save(ostream, XML_TAB_STRING.c_str());
+}
+
 
 } // namespace MaterialX

@@ -24,6 +24,9 @@ class OGSXMLFragmentWrapper
     /// Default desctructor
     ~OGSXMLFragmentWrapper();
 
+    /// @name Generation
+    /// @{
+
     /// Add a fragment wrapper for a shader generated from a given element
     void createWrapper(ElementPtr node);
 
@@ -36,6 +39,10 @@ class OGSXMLFragmentWrapper
         _outputVertexShader = val;
     }
 
+    /// @}
+    /// @name Query
+    /// @{ 
+
     /// Query if we want to output vertex shader code
     bool getOutputVertexShader() const
     {
@@ -47,6 +54,15 @@ class OGSXMLFragmentWrapper
     {
         return _pathInputMap;
     }
+
+    /// @}
+    /// @name Load
+    /// @{
+
+    /// Utility to read in an XML fragment from an input stream and return in an output stream
+    static void readDocument(std::istream& istream, std::ostream& ostream);
+
+    /// @}
 
   protected:
     void getVertexUniformSemantic(const string& name, string& semantic) const;

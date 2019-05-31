@@ -214,15 +214,13 @@ TEST_CASE("GenShader: Generate OGS fragment wrappers", "[genogsfrag]")
     {
         mx::FilePath searchPath = mx::FilePath::getCurrentPath() / mx::FilePath("libraries");
         //mx::readFromXmlFile(doc, "resources/Materials/TestSuite/stdlib/geometric/streams.mtlx");
-        //mx::readFromXmlFile(doc, "resources/Materials/TestSuite/stdlib/texture/tiledimage.mtlx");
+        mx::readFromXmlFile(doc, "resources/Materials/TestSuite/stdlib/texture/tiledimage.mtlx");
         mx::StringVec libraryFolders = { "stdlib", "pbrlib", "stdlib/genglsl", "pbrlib/genglsl", "bxdf" };
         GenShaderUtil::loadLibraries(libraryFolders, searchPath, doc);
-        mx::readFromXmlFile(doc, "resources/Materials/Examples/StandardSurface/standard_surface_brass_tiled.mtlx");
+        //mx::readFromXmlFile(doc, "resources/Materials/Examples/StandardSurface/standard_surface_brass_tiled.mtlx");
 
         std::vector<mx::GenContext*> contexts;
         mx::GenContext* glslContext = new mx::GenContext(mx::GlslShaderGenerator::create());
-        // Stop emission of environment map lookups.
-        glslContext->getOptions().hwSpecularEnvironmentMethod = mx::SPECULAR_ENVIRONMENT_NONE;
         // Stop emitting version strings
         glslContext->getOptions().emitVersionString = false;
         glslContext->registerSourceCodeSearchPath(searchPath);
@@ -233,7 +231,7 @@ TEST_CASE("GenShader: Generate OGS fragment wrappers", "[genogsfrag]")
 
         // TODO: We want 1 wrapper with both languages -- not 2 wrappers
         mx::OGSXMLFragmentWrapper glslWrapper(glslContext);
-        glslWrapper.setOutputVertexShader(true);
+        glslWrapper.setOutputVertexShader(false);
         mx::OGSXMLFragmentWrapper oslWrapper(oslContext);
 
         std::vector<mx::TypedElementPtr> renderables;
@@ -245,10 +243,14 @@ TEST_CASE("GenShader: Generate OGS fragment wrappers", "[genogsfrag]")
             mx::NodeDefPtr nodeDef = nullptr;
             if (output)
             {
+                // Stop emission of environment map lookups for texture nodes
+                glslContext->getOptions().hwSpecularEnvironmentMethod = mx::SPECULAR_ENVIRONMENT_NONE;
                 nodeDef = output->getConnectedNode()->getNodeDef();
             }
             else if (shaderRef)
             {
+                // TODO: Need to setup lighting information here...
+                glslContext->getOptions().hwSpecularEnvironmentMethod = mx::SPECULAR_ENVIRONMENT_FIS;
                 nodeDef = shaderRef->getNodeDef();
             }
             if (nodeDef)
@@ -258,18 +260,39 @@ TEST_CASE("GenShader: Generate OGS fragment wrappers", "[genogsfrag]")
             }
         }
 
-        std::ofstream glslStream("glslOGSXMLFragmentDump.xml");
+        std::ofstream glslStreamFile("glslOGSXMLFragmentDump.xml");
+        std::stringstream glslStream;
         glslWrapper.getDocument(glslStream);
-        glslStream.close();
-        const mx::StringMap& inputs = glslWrapper.getPathInputMap();
-        for (auto i : inputs)
+        glslStreamFile << glslStream.str();
+        glslStreamFile.close();
+
+        std::ifstream fileStream("glslOGSXMLFragmentDump.xml");
+        std::stringstream readFileStream;
+        glslWrapper.readDocument(fileStream, readFileStream);
+
+        std::string glslStreamString;
+        glslStreamString = glslStream.str();
+        std::string readFileStreamString;
+        readFileStreamString = readFileStream.str();
+        if (readFileStreamString.compare(glslStreamString) != 0)
         {
-            std::cout << "Element: " << i.first << " maps to fragment input: " << i.second << std::endl;
+            std::cout << "OGS XML Wrapper read/write failure\n";
+            std::cout << "================= Read document ===================\n";
+            std::cout << readFileStreamString << std::endl;
+            std::cout << "================= Versus Written document ===================\n";
+            std::cout << glslStreamString << std::endl;
         }
+
+        //const mx::StringMap& inputs = glslWrapper.getPathInputMap();
+        //for (auto i : inputs)
+        //{
+        //    std::cout << "Element: " << i.first << " maps to fragment input: " << i.second << std::endl;
+        //}
 
         std::ofstream oslStream("oslOGSXMLFragmentDump.xml");
         oslWrapper.getDocument(oslStream);
         oslStream.close();
+
     }
     catch (mx::Exception& e)
     {
