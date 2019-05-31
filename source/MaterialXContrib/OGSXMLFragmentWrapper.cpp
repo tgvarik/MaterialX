@@ -313,7 +313,16 @@ void OGSXMLFragmentWrapper::createWrapperFromNode(NodePtr node, std::vector<GenC
         {
             PortElementPtr port = samplers[0];
             ShaderGenerator& generator = context->getShaderGenerator();
-            ShaderPtr shader = generator.generate(shaderName, port, *context);
+            ShaderPtr shader = nullptr;
+            try
+            {
+                shader = generator.generate(shaderName, port, *context);
+            }
+            catch (Exception& e)
+            {
+                std::cerr << "Failed to generate source code: " << e.what() << std::endl;
+                continue;
+            }
             const string& code = shader->getSourceCode();
 
             // Need to get the actual code via shader generation.
@@ -337,27 +346,22 @@ void OGSXMLFragmentWrapper::createWrapperFromNode(NodePtr node, std::vector<GenC
 }
 #endif
 
-void OGSXMLFragmentWrapper::createWrapper(NodePtr node)
+void OGSXMLFragmentWrapper::createWrapper(ElementPtr element)
 {
     _pathInputMap.clear();
 
-    NodeDefPtr nodeDef = node->getNodeDef();
-    if (!nodeDef)
-    {
-        return;
-    }
-
-    // Work-around: Need to get a node which can be sampled. Should not be required.
-    vector<PortElementPtr> samplers = node->getDownstreamPorts();
-    if (samplers.empty())
-    {
-        return;
-    }
-
-    string shaderName(node->getName());
-    PortElementPtr port = samplers[0];
+    string shaderName(element->getName());
     ShaderGenerator& generator = _context->getShaderGenerator();
-    ShaderPtr shader = generator.generate(shaderName, port, *_context);
+    ShaderPtr shader = nullptr;
+    try
+    {
+        shader = generator.generate(shaderName, element, *_context);
+    }
+    catch (Exception& e)
+    {
+        std::cerr << "Failed to generate source code: " << e.what() << std::endl;
+        return;
+    }
     if (!shader)
     {
         return;
@@ -368,10 +372,10 @@ void OGSXMLFragmentWrapper::createWrapper(NodePtr node)
         return;
     }
 
-    const string OGS_VERSION_STRING(node->getDocument()->getVersionString());
+    const string OGS_VERSION_STRING(element->getDocument()->getVersionString());
 
     pugi::xml_node xmlRoot = static_cast<pugi::xml_document*>(_xmlDocument)->append_child(OGS_FRAGMENT.c_str());
-    xmlRoot.append_attribute("name") = node->getName().c_str();
+    xmlRoot.append_attribute("name") = element->getName().c_str();
     xmlRoot.append_attribute("type") = OGS_PLUMBING.c_str();
     xmlRoot.append_attribute("class") = OGS_SHADERFRAGMENT.c_str();
     xmlRoot.append_attribute("version") = OGS_VERSION_STRING.c_str();

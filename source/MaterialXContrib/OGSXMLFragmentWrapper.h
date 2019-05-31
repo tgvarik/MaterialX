@@ -24,8 +24,8 @@ class OGSXMLFragmentWrapper
     /// Default desctructor
     ~OGSXMLFragmentWrapper();
 
-    /// Add a fragment wrapper for a shader generated from a given node
-    void createWrapper(NodePtr node);
+    /// Add a fragment wrapper for a shader generated from a given element
+    void createWrapper(ElementPtr node);
 
     /// Get the contents of the cached XML document as a stream.
     void getDocument(std::ostream& stream);
