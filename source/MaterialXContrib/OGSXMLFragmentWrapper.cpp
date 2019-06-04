@@ -28,12 +28,12 @@ OGSXMLFragmentWrapper::OGSXMLFragmentWrapper(GenContext* context) :
     _typeMap["boolean"] = "bool";
     _typeMap["float"] = "float";
     _typeMap["integer"] = "int";
-    _typeMap["string"] = "string";
+    _typeMap["string"] = "int";
     _typeMap[MaterialX::TypedValue<MaterialX::Matrix44>::TYPE] = "float4x4";
     // There is no mapping for this, so binder needs to promote from 3x3 to 4x4 before binding.
     _typeMap[MaterialX::TypedValue<MaterialX::Matrix33>::TYPE] = "float4x4";
     _typeMap[MaterialX::TypedValue<MaterialX::Color2>::TYPE] = "float2";
-    _typeMap[MaterialX::TypedValue<MaterialX::Color3>::TYPE] = "color";
+    _typeMap[MaterialX::TypedValue<MaterialX::Color3>::TYPE] = "float3";
     // To determine if this reqiures a struct creation versus allowing for colorAlpha.
     // For now just use float4 as it's generic
     //_typeMap[MaterialX::TypedValue<MaterialX::Color4>::TYPE] = "colorAlpha";
@@ -67,11 +67,13 @@ const string MTLX_GENSHADER_FILENAME("filename");
 // OGS constant strings
 const string OGS_FRAGMENT("fragment");
 const string OGS_FRAGMENT_NAME("name");
+const string OGS_FRAGMENT_UI_NAME("uiName");
 const string OGS_FRAGMENT_TYPE("type");
 const string OGS_FRAGMENT_CLASS("class");
 const string OGS_FRAGMENT_VERSION("version");
 const string OGS_FRAGMENT_TYPE_PLUMBING("plumbing");
 const string OGS_FRAGMENT_CLASS_SHADERFRAGMENT("ShadeFragment");
+const string OGS_FRAGMENT_DESCRIPTION("description");
 const string OGS_PROPERTIES("properties");
 const string OGS_GLOBAL_PROPERTY("isRequirementOnly");
 const string OGS_VALUES("values");
@@ -215,6 +217,34 @@ void getStreamSemantic(const string& name, string& semantic)
         semantic = OGS_COLORSET_SEMANTIC;
     }
 }
+
+// Add a new implementation to the implementation list.
+void addOGSImplementation(pugi::xml_node& impls, const string& language, const string& languageVersion,
+                             const string& functionName, const string& pixelShader, const string& vertexShader)
+{
+    pugi::xml_node impl = impls.append_child(OGS_IMPLEMENTATION.c_str());
+    {
+        impl.append_attribute(OGS_RENDER.c_str()) = OGS_MAYA_RENDER.c_str();
+        impl.append_attribute(OGS_LANGUAGE.c_str()) = language.c_str();
+        impl.append_attribute(OGS_LANGUAGE_VERSION.c_str()) = languageVersion.c_str();
+        pugi::xml_node func = impl.append_child(OGS_FUNCTION_NAME.c_str());
+        {
+            func.append_attribute(OGS_FUNCTION_VAL.c_str()) = functionName.c_str();
+        }
+        if (!vertexShader.empty())
+        {
+            pugi::xml_node vertexSource = impl.append_child(OGS_VERTEX_SOURCE.c_str());
+            vertexSource.append_child(pugi::node_cdata).set_value(vertexShader.c_str());
+        }
+        if (!pixelShader.empty())
+        {
+            pugi::xml_node pixelSource = impl.append_child(OGS_SOURCE.c_str());
+            // Outputs something but is the incorrect code currently
+            pixelSource.append_child(pugi::node_cdata).set_value(pixelShader.c_str());
+        }
+    }
+}
+
 }
 
 void OGSXMLFragmentWrapper::getVertexUniformSemantic(const string& name, string& semantic) const
@@ -274,10 +304,15 @@ void OGSXMLFragmentWrapper::createWrapperFromNode(NodePtr node, std::vector<GenC
     const string OGS_VERSION_STRING(node->getDocument()->getVersionString());
 
     pugi::xml_node xmlRoot = static_cast<pugi::xml_document*>(_xmlDocument)->append_child(OGS_FRAGMENT.c_str());
-    xmlRoot.append_attribute(OGS_FRAGMENT_NAME.c_str()) = node->getName().c_str();
+    const string& nodeName = node->getName();
+    xmlRoot.append_attribute(OGS_FRAGMENT_UI_NAME.c_str()) = nodeName.c_str();
+    xmlRoot.append_attribute(OGS_FRAGMENT_NAME.c_str()) = nodeName.c_str();
     xmlRoot.append_attribute(OGS_FRAGMENT_TYPE.c_str()) = OGS_FRAGMENT_TYPE_PLUMBING.c_str();
     xmlRoot.append_attribute(OGS_FRAGMENT_CLASS.c_str()) = OGS_FRAGMENT_CLASS_SHADERFRAGMENT.c_str();
     xmlRoot.append_attribute(OGS_FRAGMENT_VERSION.c_str()) = OGS_VERSION_STRING.c_str();
+
+    string description("MaterialX generated code for element: " + nodeName);
+    xmlRoot.append_child(OGS_FRAGMENT_DESCRIPTION).c_str()) = pugi::node_cdata).set_value(description.c_str()
 
     // Scan inputs and parameters and create "properties" and 
     // "values" children from the nodeDef
@@ -396,10 +431,16 @@ void OGSXMLFragmentWrapper::createWrapper(ElementPtr element)
     const string OGS_VERSION_STRING(element->getDocument()->getVersionString());
 
     pugi::xml_node xmlRoot = static_cast<pugi::xml_document*>(_xmlDocument)->append_child(OGS_FRAGMENT.c_str());
-    xmlRoot.append_attribute(OGS_FRAGMENT_NAME.c_str()) = element->getName().c_str();
+    const string& elementName = element->getName();
+    xmlRoot.append_attribute(OGS_FRAGMENT_UI_NAME.c_str()) = elementName.c_str();
+    xmlRoot.append_attribute(OGS_FRAGMENT_NAME.c_str()) = elementName.c_str();
     xmlRoot.append_attribute(OGS_FRAGMENT_TYPE.c_str()) = OGS_FRAGMENT_TYPE_PLUMBING.c_str();
     xmlRoot.append_attribute(OGS_FRAGMENT_CLASS.c_str()) = OGS_FRAGMENT_CLASS_SHADERFRAGMENT.c_str();
     xmlRoot.append_attribute(OGS_FRAGMENT_VERSION.c_str()) = OGS_VERSION_STRING.c_str();
+
+    string description("MaterialX generated code for element: " + elementName);
+    pugi::xml_node xmlDescription = xmlRoot.append_child(OGS_FRAGMENT_DESCRIPTION.c_str());
+    xmlDescription.append_child(pugi::node_cdata).set_value(description.c_str());
 
     // Scan uniform inputs and create "properties" and "values" children.
     pugi::xml_node xmlProperties = xmlRoot.append_child(OGS_PROPERTIES.c_str());
@@ -543,37 +584,25 @@ void OGSXMLFragmentWrapper::createWrapper(ElementPtr element)
     pugi::xml_node impls = xmlRoot.append_child(OGS_IMPLEMENTATION.c_str());
 
     // Need to get the actual code via shader generation.
-    pugi::xml_node impl = impls.append_child(OGS_IMPLEMENTATION.c_str());
+    string language = generator.getLanguage();
+    bool isGLSL = (language == "genglsl");
+    string language_version = generator.getTarget(); // This isn't really the version
+    if (isGLSL)
     {
-        impl.append_attribute(OGS_RENDER.c_str()) = OGS_MAYA_RENDER.c_str();
-        string language = generator.getLanguage();
-        string language_version = generator.getTarget(); // This isn't really the version
-        if (language == "genglsl")
-        {
-            // The language capabilities in OGS are fixed so map to what is available.
-            language = OGS_GLSL_LANGUAGE;
-            language_version = OGS_GLSL_LANGUAGE_VERSION;
-        }
-        impl.append_attribute(OGS_LANGUAGE.c_str()) = language.c_str();
-        impl.append_attribute(OGS_LANGUAGE_VERSION.c_str()) = language_version.c_str();
+        // The language capabilities in OGS are fixed so map to what is available.
+        language = OGS_GLSL_LANGUAGE;
+        language_version = OGS_GLSL_LANGUAGE_VERSION;
     }
-    pugi::xml_node func = impl.append_child(OGS_FUNCTION_NAME.c_str());
+
+    const string& functionName = ps.getSignature();
+    const string& vertexShaderCode = _outputVertexShader ? shader->getSourceCode(Stage::VERTEX) : EMPTY_STRING;
+
+    addOGSImplementation(impls, language, language_version, functionName, pixelShaderCode, vertexShaderCode);
+    if (isGLSL)
     {
-        func.append_attribute(OGS_FUNCTION_VAL.c_str()) = ps.getSignature().c_str();
-    }
-    if (_outputVertexShader)
-    {
-        const string& vertexShaderCode = shader->getSourceCode(Stage::VERTEX);
-        if (!vertexShaderCode.empty())
-        {
-            pugi::xml_node vertexSource = impl.append_child(OGS_VERTEX_SOURCE.c_str());
-            vertexSource.append_child(pugi::node_cdata).set_value(vertexShaderCode.c_str());
-        }
-    }
-    pugi::xml_node pixelSource = impl.append_child(OGS_SOURCE.c_str());
-    {
-        // Works but is the incorrect code currently
-        pixelSource.append_child(pugi::node_cdata).set_value(pixelShaderCode.c_str());
+        // This is not correct code. Only to add in slots
+        addOGSImplementation(impls, "HLSL", "11.0", functionName, pixelShaderCode, vertexShaderCode);
+        addOGSImplementation(impls, "Cg", "2.1", functionName, pixelShaderCode, vertexShaderCode);
     }
 }
 
