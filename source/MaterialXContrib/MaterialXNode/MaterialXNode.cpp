@@ -20,22 +20,32 @@ MString MaterialXNode::ELEMENT_ATTRIBUTE_LONG_NAME("element");
 MString MaterialXNode::ELEMENT_ATTRIBUTE_SHORT_NAME("ele");
 MObject MaterialXNode::ELEMENT_ATTRIBUTE;
 
+MString MaterialXNode::OUT_COLOR_ATTRIBUTE_LONG_NAME("outColor");
+MString MaterialXNode::OUT_COLOR_ATTRIBUTE_SHORT_NAME("oc");
+MObject MaterialXNode::OUT_COLOR_ATTRIBUTE;
+
 MaterialXNode::MaterialXNode()
 {
+	std::cout << "MaterialXNode::MaterialXNode" << std::endl;
 }
 
 MaterialXNode::~MaterialXNode()
 {
+	std::cout << "MaterialXNode::~MaterialXNode" << std::endl;
 }
 
 void* MaterialXNode::creator()
 {
-    return new MaterialXNode();
+	std::cout.rdbuf(std::cerr.rdbuf());
+	std::cout << "MaterialXNode::creator" << std::endl;
+	return new MaterialXNode();
 }
 
 MStatus MaterialXNode::initialize()
 {
+	std::cout << "MaterialXNode::initialize" << std::endl;
 	MFnTypedAttribute typedAttr;
+	MFnNumericAttribute nAttr;
 	MFnStringData stringData;
 
 	MObject theString = stringData.create();
@@ -51,10 +61,25 @@ MStatus MaterialXNode::initialize()
     CHECK_MSTATUS(typedAttr.setReadable(true));
 	CHECK_MSTATUS(addAttribute(ELEMENT_ATTRIBUTE));
 
+	OUT_COLOR_ATTRIBUTE = nAttr.createColor(OUT_COLOR_ATTRIBUTE_LONG_NAME, OUT_COLOR_ATTRIBUTE_SHORT_NAME);
+	CHECK_MSTATUS(typedAttr.setStorable(false));
+	CHECK_MSTATUS(typedAttr.setHidden(false));
+	CHECK_MSTATUS(typedAttr.setReadable(true));
+	CHECK_MSTATUS(typedAttr.setWritable(false));
+	CHECK_MSTATUS(addAttribute(OUT_COLOR_ATTRIBUTE));
+
+	CHECK_MSTATUS(attributeAffects(ELEMENT_ATTRIBUTE, OUT_COLOR_ATTRIBUTE));
+	CHECK_MSTATUS(attributeAffects(DOCUMENT_ATTRIBUTE, OUT_COLOR_ATTRIBUTE));
+
 	return MS::kSuccess;
 }
 
 MTypeId MaterialXNode::typeId() const
 {
     return MATERIALX_NODE_TYPEID;
+}
+
+MPxNode::SchedulingType MaterialXNode::schedulingType() const
+{
+	return MPxNode::SchedulingType::kParallel;
 }

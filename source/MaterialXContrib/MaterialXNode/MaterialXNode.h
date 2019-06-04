@@ -13,6 +13,7 @@ class MaterialXNode : public MPxNode
 	static void* creator();
 	static MStatus initialize();
 	MTypeId	typeId() const override;
+	SchedulingType schedulingType() const override;
 
 	static const MTypeId MATERIALX_NODE_TYPEID;
 	static const MString MATERIALX_NODE_TYPENAME;
@@ -25,7 +26,10 @@ class MaterialXNode : public MPxNode
     static MString ELEMENT_ATTRIBUTE_LONG_NAME;
     static MString ELEMENT_ATTRIBUTE_SHORT_NAME;
     static MObject ELEMENT_ATTRIBUTE;
-
+	/// Attribute holding the output color of the node
+	static MString OUT_COLOR_ATTRIBUTE_LONG_NAME;
+	static MString OUT_COLOR_ATTRIBUTE_SHORT_NAME;
+	static MObject OUT_COLOR_ATTRIBUTE;
 };
 
 #endif /* MATERIALX_NODE_H */

@@ -105,9 +105,11 @@ if (EXISTS "${MAYA_DEBUG_DIR}" OR EXISTS "${MAYA_RELEASE_DIR}")
 
     target_link_libraries(
         MaterialXNode
+        MaterialXContrib
         MaterialXCore
         MaterialXFormat
         MaterialXGenShader
+        MaterialXGenGlsl
         MaterialXRender
         ${CMAKE_DL_LIBS}
     )

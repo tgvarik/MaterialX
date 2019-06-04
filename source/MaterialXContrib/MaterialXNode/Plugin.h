@@ -18,12 +18,18 @@ class Plugin
 		return _librarySearchPath;
 	}
 
+	MaterialX::FilePath getOGSXMLFragmentPath() const
+	{
+		return _ogsXmlFragmentPath;
+	}
+
   private:
 	Plugin()
 	{
 	}
 
 	std::string _librarySearchPath;
+	std::string _ogsXmlFragmentPath;
 };
 
 #endif /* PLUGIN_H */

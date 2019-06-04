@@ -1,6 +1,10 @@
 #ifndef MaterialXTextureOverride_H
 #define MaterialXTextureOverride_H
 
+#include "../OGSXMLFragmentWrapper.h"
+
+#include <MaterialXCore/Document.h>
+
 #include <maya/MPxShadingNodeOverride.h>
 
 /// VP2 Texture fragment override
@@ -20,10 +24,15 @@ class MaterialXTextureOverride : public MHWRender::MPxShadingNodeOverride
 	void updateShader(MHWRender::MShaderInstance& shader,
 	                  const MHWRender::MAttributeParameterMappingList& mappings) override;
 
-  private:
+	static const MString REGISTRANT_ID;
+
+private:
 	MaterialXTextureOverride(const MObject& obj);
 
-	MString _document;
+	MaterialX::OGSXMLFragmentWrapper* _glslWrapper;
+	MaterialX::DocumentPtr _document;
+	MString _fragmentName;
+	MString _documentContent;
 	MString _element;
 	MObject _object;
 };
