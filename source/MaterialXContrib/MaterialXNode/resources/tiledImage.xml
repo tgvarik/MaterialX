@@ -57,7 +57,7 @@ void NG_tiledimage_color3(sampler2D file, vec3 default1, vec2 texcoord, vec2 uvt
     N_out_color3 = N_img_color3_out;
 }
 
-void tiled_image3_function(
+vec3 tiled_image3_function(
     sampler2D mapSampler,
 	vec3 tiled_image3_default,
 	vec2 tiled_image3_uvtiling,
@@ -71,7 +71,7 @@ void tiled_image3_function(
     vec2 geomprop_UV0_out = uvCoord;
     vec3 tiled_image3_out = vec3(0.0);
     NG_tiledimage_color3(mapSampler, tiled_image3_default, geomprop_UV0_out, tiled_image3_uvtiling, tiled_image3_uvoffset, tiled_image3_filtertype, tiled_image3_framerange, tiled_image3_frameoffset, tiled_image3_frameendaction, tiled_image3_out);
-    outColor = tiled_image3_out;
+    return vec3(1.0f, 0.0f, 0.0f);
 }
 
 ]]></source>
