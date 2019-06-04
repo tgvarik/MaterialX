@@ -1,18 +1,18 @@
-<?xml version="1.0"?>
-<fragment name="tiled_image3_output" type="plumbing" class="ShadeFragment" version="1.36">
+<fragment uiName="tiled_image3_output" name="tiled_image3_output" type="plumbing" class="ShadeFragment" version="1.36">
+  <description><![CDATA[MaterialX generated code for element: tiled_image3_output]]></description>
   <properties>
     <sampler name="tiled_image3_file"  />
-    <color name="tiled_image3_default"  />
+    <float3 name="tiled_image3_default"  />
     <float2 name="tiled_image3_uvtiling"  />
     <float2 name="tiled_image3_uvoffset"  />
     <int name="tiled_image3_filtertype"  />
-    <int name="tiled_image3_framerange" /> 
+    <int name="tiled_image3_framerange" />
     <int name="tiled_image3_frameoffset"  />
     <int name="tiled_image3_frameendaction"  />
-    <float2 name="i_texcoord_0" semantic="mayaUvCoordSemantic" flags="varyingInputParam" />
+    <float2 name="uvCoord" semantic="mayaUvCoordSemantic" flags="varyingInputParam" />
   </properties>
   <values>
-    <color name="tiled_image3_default" value="0, 0, 0" />
+    <float3 name="tiled_image3_default" value="0, 0, 0" />
     <float2 name="tiled_image3_uvtiling" value="2, 2" />
     <float2 name="tiled_image3_uvoffset" value="0.5, 0.5" />
     <int name="tiled_image3_filtertype" value="0" />
@@ -20,7 +20,7 @@
     <int name="tiled_image3_frameendaction" value="1" />
   </values>
   <outputs>
-    <float3 name="tiled_image3_output" />
+    <float3 name="outColor" />
   </outputs>
   <implementation>
     <implementation render="OGSRenderer" language="GLSL" lang_version="3.0">
@@ -64,15 +64,23 @@ void tiled_image3_function(sampler2D tiled_image3_file,
 	int tiled_image3_framerange,
 	int tiled_image3_frameoffset,
 	int tiled_image3_frameendaction,
-	float2 i_texcoord_0)
+	float2 uvCoord)
 {
-    vec2 geomprop_UV0_out = i_texcoord_0;
+    vec2 geomprop_UV0_out = uvCoord;
     vec3 tiled_image3_out = vec3(0.0);
     NG_tiledimage_color3(tiled_image3_file, tiled_image3_default, geomprop_UV0_out, tiled_image3_uvtiling, tiled_image3_uvoffset, tiled_image3_filtertype, tiled_image3_framerange, tiled_image3_frameoffset, tiled_image3_frameendaction, tiled_image3_out);
-    tiled_image3_output = tiled_image3_out;
+    outColor = tiled_image3_out;
 }
 
 ]]></source>
+    </implementation>
+    <implementation render="OGSRenderer" language="HLSL" lang_version="11.0">
+      <function_name val="tiled_image3_function" />
+      <source><![CDATA[// HLSL source]]></source>
+    </implementation>
+    <implementation render="OGSRenderer" language="Cg" lang_version="2.1">
+      <function_name val="tiled_image3_function" />
+      <source><![CDATA[// Cg source]]></source>
     </implementation>
   </implementation>
 </fragment>
