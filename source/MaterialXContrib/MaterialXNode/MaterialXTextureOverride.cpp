@@ -151,6 +151,14 @@ void MaterialXTextureOverride::updateDG()
 void MaterialXTextureOverride::updateShader(MHWRender::MShaderInstance& shader, 
                                             const MHWRender::MAttributeParameterMappingList& /*mappings*/)
 {
+    MStringArray params;
+    shader.parameterList(params);
+    for (unsigned int i = 0; i < params.length(); i++)
+    {
+        std::cout << "Shader param: " << params[i] << std::endl;
+    }
+
+    MStatus status;
 	const MaterialX::StringMap& inputs = _glslWrapper->getPathInputMap();
 	for (auto i : inputs)
 	{
@@ -169,31 +177,32 @@ void MaterialXTextureOverride::updateShader(MHWRender::MShaderInstance& shader,
 				
 				if (samplerState)
 				{
-					shader.setParameter(i.second.c_str(), *samplerState);
+                    status = shader.setParameter("mapSampler", *samplerState);
+                    std::cout << "Bind map mapSampler: " << status << std::endl;
 				}
-				/*
-				// Set texture
+
+                // Set texture
+                MString fileName("d:/Work/materialx/MaterialX-adsk-public/build_public_rel/installed/resources/Images/grid.png");
 				MHWRender::MRenderer* renderer = MHWRender::MRenderer::theRenderer();
 				if (renderer)
 				{
-					MHWRender::MTextureManager* textureManager =
-					renderer->getTextureManager();
+					MHWRender::MTextureManager* textureManager = renderer->getTextureManager();
 					if (textureManager)
 					{
 						MHWRender::MTexture* texture =
-						textureManager->acquireTexture(fFileName);
+						textureManager->acquireTexture(fileName, "");
 						if (texture)
 						{
 							MHWRender::MTextureAssignment textureAssignment;
 							textureAssignment.texture = texture;
-							shader.setParameter(fResolvedMapName, textureAssignment);
+                            status = shader.setParameter("map", textureAssignment);
+                            std::cout << "Bind map: " << status << std::endl;
 
 							// release our reference now that it is set on the shader
 							textureManager->releaseTexture(texture);
 						}
 					}
-				}
-				*/
+				}				
 			}
 			else if (valueElement->getType() == MaterialX::TypedValue<MaterialX::Vector2>::TYPE)
 			{

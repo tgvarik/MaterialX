@@ -1,7 +1,8 @@
 <fragment uiName="tiled_image3_output" name="tiled_image3_output" type="plumbing" class="ShadeFragment" version="1.36">
   <description><![CDATA[MaterialX generated code for element: tiled_image3_output]]></description>
   <properties>
-    <sampler name="tiled_image3_file"  />
+	<texture2 name="map" />
+    <sampler name="mapSampler"  />
     <float3 name="tiled_image3_default"  />
     <float2 name="tiled_image3_uvtiling"  />
     <float2 name="tiled_image3_uvoffset"  />
@@ -56,7 +57,8 @@ void NG_tiledimage_color3(sampler2D file, vec3 default1, vec2 texcoord, vec2 uvt
     N_out_color3 = N_img_color3_out;
 }
 
-void tiled_image3_function(sampler2D tiled_image3_file,
+void tiled_image3_function(
+    sampler2D mapSampler,
 	vec3 tiled_image3_default,
 	vec2 tiled_image3_uvtiling,
 	vec2 tiled_image3_uvoffset,
@@ -68,7 +70,7 @@ void tiled_image3_function(sampler2D tiled_image3_file,
 {
     vec2 geomprop_UV0_out = uvCoord;
     vec3 tiled_image3_out = vec3(0.0);
-    NG_tiledimage_color3(tiled_image3_file, tiled_image3_default, geomprop_UV0_out, tiled_image3_uvtiling, tiled_image3_uvoffset, tiled_image3_filtertype, tiled_image3_framerange, tiled_image3_frameoffset, tiled_image3_frameendaction, tiled_image3_out);
+    NG_tiledimage_color3(mapSampler, tiled_image3_default, geomprop_UV0_out, tiled_image3_uvtiling, tiled_image3_uvoffset, tiled_image3_filtertype, tiled_image3_framerange, tiled_image3_frameoffset, tiled_image3_frameendaction, tiled_image3_out);
     outColor = tiled_image3_out;
 }
 
