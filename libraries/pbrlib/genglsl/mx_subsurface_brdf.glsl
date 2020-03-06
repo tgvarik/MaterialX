@@ -9,7 +9,7 @@ void mx_subsurface_brdf_reflection(vec3 L, vec3 V, float weight, vec3 color, vec
         return;
     }
 
-    result = color * weight * NdotL * M_PI_INV;
+    result = BSDF(color * weight * NdotL * M_PI_INV);
 }
 
 // Fake with simple diffuse transmission

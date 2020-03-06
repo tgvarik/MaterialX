@@ -41,15 +41,15 @@ vec3 mx_hsvtorgb(vec3 hsv)
 {
     // Reference for this technique: Foley & van Dam
     float h = hsv.x; float s = hsv.y; float v = hsv.z;
-    if (s < 0.0001f) {
+    if (s < 0.0001) {
       return vec3 (v, v, v);
     } else {
-        h = 6.0f * (h - floor(h));  // expand to [0..6)
+        h = 6.0 * (h - floor(h));  // expand to [0..6)
         int hi = int(trunc(h));
         float f = h - float(hi);
-        float p = v * (1.0f-s);
-        float q = v * (1.0f-s*f);
-        float t = v * (1.0f-s*(1.0f-f));
+        float p = v * (1.0-s);
+        float q = v * (1.0-s*f);
+        float t = v * (1.0-s*(1.0-f));
         if (hi == 0)
             return vec3 (v, t, p);
         else if (hi == 1)
@@ -74,18 +74,18 @@ vec3 mx_rgbtohsv(vec3 c)
     float delta = maxcomp - mincomp;  // chroma
     float h, s, v;
     v = maxcomp;
-    if (maxcomp > 0.0f)
+    if (maxcomp > 0.0)
         s = delta / maxcomp;
-    else s = 0.0f;
-    if (s <= 0.0f)
-        h = 0.0f;
+    else s = 0.0;
+    if (s <= 0.0)
+        h = 0.0;
     else {
         if      (r >= maxcomp) h = (g-b) / delta;
-        else if (g >= maxcomp) h = 2.0f + (b-r) / delta;
-        else                   h = 4.0f + (r-g) / delta;
-        h *= (1.0f/6.0f);
-        if (h < 0.0f)
-            h += 1.0f;
+        else if (g >= maxcomp) h = 2.0 + (b-r) / delta;
+        else                   h = 4.0 + (r-g) / delta;
+        h *= (1.0/6.0);
+        if (h < 0.0)
+            h += 1.0;
     }
     return vec3(h, s, v);
 }

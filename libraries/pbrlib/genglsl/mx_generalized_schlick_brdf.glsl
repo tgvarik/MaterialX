@@ -30,8 +30,8 @@ void mx_generalized_schlick_brdf_reflection(vec3 L, vec3 V, float weight, vec3 c
     float avgF = dot(F, vec3(1.0 / 3.0));
 
     // Note: NdotL is cancelled out
-    result = D * G * F / (4 * NdotV)    // Top layer reflection
-           + base * (1.0 - avgF);       // Base layer reflection attenuated by top fresnel
+    result = BSDF(D * G * F / (4.0 * NdotV))    // Top layer reflection
+           + base * BSDF(1.0 - avgF);       // Base layer reflection attenuated by top fresnel
 }
 
 void mx_generalized_schlick_brdf_transmission(vec3 V, float weight, vec3 color0, vec3 color90, float exponent, vec2 roughness, vec3 N, vec3 X, int distribution, BSDF base, out BSDF result)
@@ -52,7 +52,7 @@ void mx_generalized_schlick_brdf_transmission(vec3 V, float weight, vec3 color0,
     F *= weight;
     float avgF = dot(F, vec3(1.0 / 3.0));
 
-    result = base * (1.0 - avgF); // Base layer transmission attenuated by top fresnel
+    result = base * BSDF(1.0 - avgF); // Base layer transmission attenuated by top fresnel
 }
 
 void mx_generalized_schlick_brdf_indirect(vec3 V, float weight, vec3 color0, vec3 color90, float exponent, vec2 roughness, vec3 N, vec3 X, int distribution, BSDF base, out BSDF result)
@@ -70,6 +70,6 @@ void mx_generalized_schlick_brdf_indirect(vec3 V, float weight, vec3 color0, vec
     F *= weight;
     float avgF = dot(F, vec3(1.0 / 3.0));
 
-    result = Li * F                 // Top layer reflection
-           + base * (1.0 - avgF);   // Base layer reflection attenuated by top fresnel
+    result = BSDF(Li * F)                 // Top layer reflection
+           + base * BSDF(1.0 - avgF);   // Base layer reflection attenuated by top fresnel
 }

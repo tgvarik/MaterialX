@@ -29,8 +29,8 @@ void mx_dielectric_brdf_reflection(vec3 L, vec3 V, float weight, vec3 tint, floa
     F *= weight;
 
     // Note: NdotL is cancelled out
-    result = tint * D * G * F / (4 * NdotV) // Top layer reflection
-           + base * (1.0 - F);              // Base layer reflection attenuated by top fresnel
+    result = BSDF(tint * D * G * F / (4.0 * NdotV)) // Top layer reflection
+               + base * BSDF(1.0 - F);              // Base layer reflection attenuated by top fresnel
 }
 
 void mx_dielectric_brdf_transmission(vec3 V, float weight, vec3 tint, float ior, vec2 roughness, vec3 N, vec3 X, int distribution, BSDF base, out BSDF result)
@@ -50,7 +50,7 @@ void mx_dielectric_brdf_transmission(vec3 V, float weight, vec3 tint, float ior,
     float F = mx_fresnel_schlick(NdotV, ior);
     F *= weight;
 
-    result = base * (1.0 - F); // Base layer transmission attenuated by top fresnel
+    result = base * BSDF(1.0 - F); // Base layer transmission attenuated by top fresnel
 }
 
 void mx_dielectric_brdf_indirect(vec3 V, float weight, vec3 tint, float ior, vec2 roughness, vec3 N, vec3 X, int distribution, BSDF base, out BSDF result)
@@ -67,6 +67,6 @@ void mx_dielectric_brdf_indirect(vec3 V, float weight, vec3 tint, float ior, vec
     float F = mx_fresnel_schlick_roughness(NdotV, ior, max(roughness.x, roughness.y));
     F *= weight;
 
-    result = Li * tint * F     // Top layer reflection
-           + base * (1.0 - F); // Base layer reflection attenuated by top fresnel
+    result = BSDF(Li * tint * F)     // Top layer reflection
+           + base * BSDF(1.0 - F); // Base layer reflection attenuated by top fresnel
 }

@@ -34,15 +34,15 @@ void mx_sheen_brdf_reflection(vec3 L, vec3 V, float weight, vec3 color, float ro
 
     // We need to include NdotL from the light integral here
     // as in this case it's not cancelled out by the BRDF denominator.
-    result = fr * NdotL             // Top layer reflection
-           + base * (1.0 - albedo); // Base layer reflection attenuated by top layer
+    result = BSDF(fr * NdotL)             // Top layer reflection
+           + base * BSDF(1.0 - albedo); // Base layer reflection attenuated by top layer
 }
 
 void mx_sheen_brdf_indirect(vec3 V, float weight, vec3 color, float roughness, vec3 N, BSDF base, out vec3 result)
 {
     if (weight <= 0.0)
     {
-        result = base;
+        result = vec3(base.x, base.y, base.z);
         return;
     }
 
@@ -51,5 +51,5 @@ void mx_sheen_brdf_indirect(vec3 V, float weight, vec3 color, float roughness, v
     float albedo = weight * mx_microfacet_sheen_albedo(NdotV, alpha);
 
     vec3 Li = mx_environment_irradiance(N);
-    result = Li * color * albedo + base * (1.0 - albedo);
+    result = Li * color * albedo + vec3(base.x, base.y, base.z) * (1.0 - albedo);
 }

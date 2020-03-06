@@ -204,7 +204,7 @@ float mx_burley_diffuse(vec3 L, vec3 V, vec3 N, float NdotL, float roughness)
 float mx_burley_directional_albedo(vec3 V, vec3 N, float roughness)
 {
     float x = dot(N, V);
-    float fit0 = 0.97619 - 0.488095 * mx_pow5(1 - x);
+    float fit0 = 0.97619 - 0.488095 * mx_pow5(1.0 - x);
     float fit1 = 1.55754 + (-2.02221 + (2.56283 - 1.06244 * x) * x) * x;
     return mix(fit0, fit1, roughness);
 }
