@@ -31,7 +31,7 @@ if(MATERIALX_DISABLE_BUILD_RENDER)
 endif()
 
 option(MATERIALX_PYTHON_LTO "Enable link-time optimizations for MaterialX Python." ON)
-option(MATERIALX_INSTALL_PYTHON "Install the MaterialX Python package as a third-party library when the install target is built.")
+option(MATERIALX_INSTALL_PYTHON "Install the MaterialX Python package as a third-party library when the install target is built." ON)
 
 option(MATERIALX_TEST_RENDER "Run rendering tests for MaterialX Render module. GPU required for graphics validation." OFF)
 option(MATERIALX_BUILD_OIIO "Build OpenImageIO support for MaterialXRender." OFF)
