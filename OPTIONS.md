@@ -9,7 +9,7 @@ force others on or off as noted in the descriptions below.
 
 Build the MaterialX Python package. Requires [Python 2.7](https://www.python.org/) or greater.
 
-The following additional options are available when `MATERIALX_BUILD_PYTHON=ON`:
+The following additional options are only relevant when `MATERIALX_BUILD_PYTHON=ON`:
 - `MATERIALX_PYTHON_LTO` (default: `ON`): Enable link-time optimizations for MaterialX Python package.
 - `MATERIALX_INSTALL_PYTHON` (default: `ON`): Install the MaterialX Python package as a third-party library when the install target is built.
 
@@ -23,7 +23,7 @@ Build the MaterialX Render modules. This option replaces the deprecated `MATERIA
 
 The [resources](resources) folder will be copied to the install location only if the Render modules are built.
 
-The following additional options are available when `MATERIALX_BUILD_RENDER=ON`:
+The following additional options are only relevant when `MATERIALX_BUILD_RENDER=ON`:
 - `MATERIALX_TEST_RENDER` (default: `OFF`): Run rendering tests. GPU required.
 - `MATERIALX_BUILD_VIEWER` (default: `ON`): Build the MaterialX Viewer. Requires the NanoGUI submodule to be present. Run `git submodule update --init --recursive` from the repository root to load it.
 - `MATERIALX_BUILD_CONTRIB` (default: `ON`): Build the [contributions folder](source/MaterialXContrib).
