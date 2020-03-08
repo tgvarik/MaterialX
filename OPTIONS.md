@@ -44,6 +44,10 @@ Build the GLSL to HSLS cross-compiler. Requires [glslang](https://github.com/Khr
 
 Build the Doxygen docs. Requires [Doxygen](http://www.doxygen.nl/).
 
+### `MATERIALX_BUILD_TESTS` (default: `ON`)
+
+Build the unit tests.
+
 ## Shader Generation Options
 
 These options control building of shader code generators for each of the supported languages.

@@ -37,6 +37,7 @@ option(MATERIALX_TEST_RENDER "Run rendering tests for MaterialX Render module. G
 option(MATERIALX_BUILD_OIIO "Build OpenImageIO support for MaterialXRender." OFF)
 option(MATERIALX_BUILD_VIEWER "Build the MaterialX Viewer." ON)
 option(MATERIALX_BUILD_CONTRIB "Build contribution folder." ON)
+option(MATERIALX_BUILD_TESTS "Build unit tests." ON)
 
 if (NOT MATERIALX_BUILD_PYTHON)
     set(MATERIALX_PYTHON_LTO OFF)
@@ -205,7 +206,6 @@ if (MATERIALX_BUILD_RENDER)
     endif()
 
     if(MATERIALX_TEST_RENDER)
-        add_subdirectory(source/MaterialXTest)
         add_definitions(-DMATERIALX_TEST_RENDER)
     endif()
 
@@ -228,6 +228,10 @@ endif()
 
 if(MATERIALX_BUILD_DOCS)
     add_subdirectory(documents)
+endif()
+
+if(MATERIALX_BUILD_TESTS)
+    add_subdirectory(source/MaterialXTest)
 endif()
 
 if(${CMAKE_VERSION} VERSION_GREATER "3.6.2")
