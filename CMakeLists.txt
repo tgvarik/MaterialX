@@ -16,9 +16,9 @@ option(MATERIALX_WARNINGS_AS_ERRORS "Interpret all compiler warnings as errors."
 # Shading language generation options
 option(MATERIALX_BUILD_GEN_GLSL "Build the GLSL shader generator back-end." ON)
 option(MATERIALX_BUILD_GEN_OSL "Build the OSL shader generator back-end." ON)
-option(MATERIALX_BUILD_GEN_OGSXML "Build the OGSXML shader generator back-end." OFF)
-option(MATERIALX_BUILD_GEN_OGSFX "Build the OGSFX shader generator back-end." OFF)
-option(MATERIALX_BUILD_GEN_ARNOLD "Build the Arnold OSL shader generator back-end." OFF)
+option(MATERIALX_BUILD_GEN_OGSXML "Build the OGSXML shader generator back-end." ON)
+option(MATERIALX_BUILD_GEN_OGSFX "Build the OGSFX shader generator back-end." ON)
+option(MATERIALX_BUILD_GEN_ARNOLD "Build the Arnold OSL shader generator back-end." ON)
 
 option(MATERIALX_BUILD_PYTHON "Build the MaterialX Python package from C++ bindings. Requires Python 2.7 or greater." OFF)
 option(MATERIALX_BUILD_RUNTIME "Build the MaterialX Runtime data model library." OFF)

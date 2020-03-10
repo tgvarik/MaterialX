@@ -62,15 +62,15 @@ Build the GLSL shader generator back-end.
 
 Build the OSL shader generator back-end.
 
-### `MATERIALX_BUILD_GEN_OGSXML` (default: `OFF`)
+### `MATERIALX_BUILD_GEN_OGSXML` (default: `ON`)
 
 Build the OGSXML shader generator back-end.
 
-### `MATERIALX_BUILD_GEN_OGSFX` (default: `OFF`)
+### `MATERIALX_BUILD_GEN_OGSFX` (default: `ON`)
 
 Build the OGSFX shader generator back-end.
 
-### `MATERIALX_BUILD_GEN_ARNOLD` (default: `OFF`)
+### `MATERIALX_BUILD_GEN_ARNOLD` (default: `ON`)
 
 Build the Arnold OSL shader generator back-end.
 
