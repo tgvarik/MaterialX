@@ -6,7 +6,6 @@
 #include <MaterialXTest/Catch/catch.hpp>
 
 #include <MaterialXCore/Document.h>
-#include <MaterialXCore/TypeDesc.h>
 #include <MaterialXCore/UnitConverter.h>
 #include <MaterialXFormat/File.h>
 #include <MaterialXFormat/XmlIo.h>
@@ -153,32 +152,31 @@ TEST_CASE("UnitDocument", "[units]")
             {
                 if (pNode->getInputCount()) {
                     for (mx::InputPtr input : pNode->getInputs()) {
-                        const mx::TypeDesc* type = mx::TypeDesc::get(input->getType());
+                        const std::string type = input->getType();
                         const mx::ValuePtr value = input->getValue();
                         if (input->hasUnit() && value) {
-
-                            if (type->isScalar() && type->getBaseType() == mx::TypeDesc::BASETYPE_FLOAT)
+                            if (type == "float")
                             {
                                 float originalval = value->asA<float>();
                                 float convertedValue = uconverter->convert(originalval, input->getUnit(), DISTANCE_DEFAULT);
                                 float reconvert = uconverter->convert(convertedValue, DISTANCE_DEFAULT, input->getUnit());
                                 REQUIRE((originalval - reconvert) < EPSILON);
                             }
-                            else if (type->isFloat2())
+                            else if (type == "vector2" || type == "color2")
                             {
                                 mx::Vector2 originalval = value->asA<mx::Vector2>();
                                 mx::Vector2 convertedValue = uconverter->convert(originalval, input->getUnit(), DISTANCE_DEFAULT);
                                 mx::Vector2 reconvert = uconverter->convert(convertedValue, DISTANCE_DEFAULT, input->getUnit());
                                 REQUIRE(originalval == reconvert);
                             }
-                            else if (type->isFloat3())
+                            else if (type == "vector3" || type == "color3")
                             {
                                 mx::Vector3 originalval = value->asA<mx::Vector3>();
                                 mx::Vector3 convertedValue = uconverter->convert(originalval, input->getUnit(), DISTANCE_DEFAULT);
                                 mx::Vector3 reconvert = uconverter->convert(convertedValue, DISTANCE_DEFAULT, input->getUnit());
                                 REQUIRE(originalval == reconvert);
                             }
-                            else if (type->isFloat4())
+                            else if (type == "vector4" || type == "color4")
                             {
                                 mx::Vector4 originalval = value->asA<mx::Vector4>();
                                 mx::Vector4 convertedValue = uconverter->convert(originalval, input->getUnit(), DISTANCE_DEFAULT);
@@ -191,32 +189,32 @@ TEST_CASE("UnitDocument", "[units]")
 
                 if (pNode->getParameterCount()) {
                     for (mx::ParameterPtr param: pNode->getParameters()) {
-                        const mx::TypeDesc* type = mx::TypeDesc::get(param->getType());
+                        const std::string type = param->getType();
                         const mx::ValuePtr value = param->getValue();
                         if (param->hasUnit() && value) {
 
-                            if (type->isScalar() && type->getBaseType() == mx::TypeDesc::BASETYPE_FLOAT)
+                            if (type == "float")
                             {
                                 float originalval = value->asA<float>();
                                 float convertedValue = uconverter->convert(originalval, param->getUnit(), DISTANCE_DEFAULT);
                                 float reconvert = uconverter->convert(convertedValue, DISTANCE_DEFAULT, param->getUnit());
                                 REQUIRE((originalval - reconvert) < EPSILON);
                             }
-                            else if (type->isFloat2())
+                            else if (type == "vector2" || type == "color2")
                             {
                                 mx::Vector2 originalval = value->asA<mx::Vector2>();
                                 mx::Vector2 convertedValue = uconverter->convert(originalval, param->getUnit(), DISTANCE_DEFAULT);
                                 mx::Vector2 reconvert = uconverter->convert(convertedValue, DISTANCE_DEFAULT, param->getUnit());
                                 REQUIRE(originalval == reconvert);
                             }
-                            else if (type->isFloat3())
+                            else if (type == "vector3" || type == "color3")
                             {
                                 mx::Vector3 originalval = value->asA<mx::Vector3>();
                                 mx::Vector3 convertedValue = uconverter->convert(originalval, param->getUnit(), DISTANCE_DEFAULT);
                                 mx::Vector3 reconvert = uconverter->convert(convertedValue, DISTANCE_DEFAULT, param->getUnit());
                                 REQUIRE(originalval == reconvert);
                             }
-                            else if (type->isFloat4())
+                            else if (type == "vector4" || type == "color4")
                             {
                                 mx::Vector4 originalval = value->asA<mx::Vector4>();
                                 mx::Vector4 convertedValue = uconverter->convert(originalval, param->getUnit(), DISTANCE_DEFAULT);
@@ -230,43 +228,4 @@ TEST_CASE("UnitDocument", "[units]")
             }
         }
     }
-}
-
-TEST_CASE("Core: TypeDesc Check", "[units]")
-{
-  // Make sure the standard types are registered
-  const mx::TypeDesc* floatType = mx::TypeDesc::get("float");
-  REQUIRE(floatType != nullptr);
-  REQUIRE(floatType->getBaseType() == mx::TypeDesc::BASETYPE_FLOAT);
-  const mx::TypeDesc* integerType = mx::TypeDesc::get("integer");
-  REQUIRE(integerType != nullptr);
-  REQUIRE(integerType->getBaseType() == mx::TypeDesc::BASETYPE_INTEGER);
-  const mx::TypeDesc* booleanType = mx::TypeDesc::get("boolean");
-  REQUIRE(booleanType != nullptr);
-  REQUIRE(booleanType->getBaseType() == mx::TypeDesc::BASETYPE_BOOLEAN);
-  const mx::TypeDesc* color2Type = mx::TypeDesc::get("color2");
-  REQUIRE(color2Type != nullptr);
-  REQUIRE(color2Type->getBaseType() == mx::TypeDesc::BASETYPE_FLOAT);
-  REQUIRE(color2Type->getSemantic() == mx::TypeDesc::SEMANTIC_COLOR);
-  REQUIRE(color2Type->isFloat2());
-  const mx::TypeDesc* color3Type = mx::TypeDesc::get("color3");
-  REQUIRE(color3Type != nullptr);
-  REQUIRE(color3Type->getBaseType() == mx::TypeDesc::BASETYPE_FLOAT);
-  REQUIRE(color3Type->getSemantic() == mx::TypeDesc::SEMANTIC_COLOR);
-  REQUIRE(color3Type->isFloat3());
-  const mx::TypeDesc* color4Type = mx::TypeDesc::get("color4");
-  REQUIRE(color4Type != nullptr);
-  REQUIRE(color4Type->getBaseType() == mx::TypeDesc::BASETYPE_FLOAT);
-  REQUIRE(color4Type->getSemantic() == mx::TypeDesc::SEMANTIC_COLOR);
-  REQUIRE(color4Type->isFloat4());
-
-  // Make sure we can register a new sutom type
-  const mx::TypeDesc* fooType = mx::TypeDesc::registerType("foo", mx::TypeDesc::BASETYPE_FLOAT, mx::TypeDesc::SEMANTIC_COLOR, 5);
-  REQUIRE(fooType != nullptr);
-
-  // Make sure we can't use a name already take
-  REQUIRE_THROWS(mx::TypeDesc::registerType("color3", mx::TypeDesc::BASETYPE_FLOAT));
-
-  // Make sure we can't request an unknown type
-  REQUIRE_THROWS(mx::TypeDesc::get("bar"));
 }

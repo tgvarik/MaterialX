@@ -8,13 +8,13 @@
 
 #include <MaterialXCore/Util.h>
 #include <MaterialXCore/UnitConverter.h>
-#include <MaterialXCore/TypeDesc.h>
 
 #include <MaterialXFormat/File.h>
 #include <MaterialXFormat/Util.h>
 
 #include <MaterialXGenShader/Shader.h>
 #include <MaterialXGenShader/Util.h>
+#include <MaterialXGenShader/TypeDesc.h>
 
 namespace mx = MaterialX;
 

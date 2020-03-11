@@ -13,7 +13,7 @@
 
 #include <MaterialXGenShader/DefaultColorManagementSystem.h>
 #include <MaterialXGenShader/HwShaderGenerator.h>
-#include <MaterialXCore/TypeDesc.h>
+#include <MaterialXGenShader/TypeDesc.h>
 #include <MaterialXGenShader/UnitSystem.h>
 #include <MaterialXGenShader/Util.h>
 

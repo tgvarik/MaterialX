@@ -1,5 +1,3 @@
-cmake_policy(SET CMP0079 NEW)
-
 set(MATERIALX_TEST_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 
 # Discover all tests and allow them to be run in parallel (ctest -j20):
@@ -34,37 +32,58 @@ assign_source_group("Header Files" ${materialx_headers})
 target_sources(MaterialXTest PUBLIC ${materialx_source} ${materialx_headers})
 
 add_subdirectory(MaterialXCore)
+target_link_libraries(MaterialXTest MaterialXCore)
 add_subdirectory(MaterialXFormat)
+target_link_libraries(MaterialXTest MaterialXFormat)
 
 if(MATERIALX_BUILD_GEN)
   add_subdirectory(MaterialXGenShader)
+  target_link_libraries(MaterialXTest MaterialXGenShader)
   if(MATERIALX_BUILD_RUNTIME)
     add_subdirectory(MaterialXRuntime)
+    target_link_libraries(MaterialXTest MaterialXRuntime)
   endif()
   if(MATERIALX_BUILD_GEN_GLSL)
     add_subdirectory(MaterialXGenGlsl)
+    target_link_libraries(MaterialXTest MaterialXGenGlsl)
   endif()
   if(MATERIALX_BUILD_GEN_OSL)
     add_subdirectory(MaterialXGenOsl)
+    target_link_libraries(MaterialXTest MaterialXGenOsl)
   endif()
   if(MATERIALX_BUILD_GEN_OGSXML)
     add_subdirectory(MaterialXGenOgsXml)
+    target_link_libraries(MaterialXTest MaterialXGenGlsl MaterialXGenOgsXml)
+    if (MATERIALX_BUILD_CROSS)
+      target_link_libraries(MaterialXTest MaterialXCross)
+    endif()
   endif()
   if(MATERIALX_BUILD_GEN_OGSFX)
     add_subdirectory(MaterialXGenOgsFx)
+    target_link_libraries(MaterialXTest MaterialXGenGlsl MaterialXGenOgsFx)
   endif()
   if(MATERIALX_BUILD_GEN_ARNOLD)
     add_subdirectory(MaterialXGenArnold)
+    target_link_libraries(MaterialXTest MaterialXGenArnold)
   endif()
 endif()
 
-if(MATERIALX_BUILD_RENDER)
+if(MATERIALX_BUILD_RENDER) # MATERIALX_BUILD_GEN is implied; can assume relevant MaterialXGen* libs already linked above
   add_subdirectory(MaterialXRender)
+  target_link_libraries(MaterialXTest MaterialXRender)
+  if(MATERIALX_BUILD_CONTRIB)
+    target_link_libraries(MaterialXTest MaterialXContrib)
+  endif()
+  if (MATERIALX_BUILD_OIIO)
+    target_link_libraries(MaterialXTest ${OPENIMAGEIO_LIBRARIES})
+  endif()
   if(MATERIALX_BUILD_GEN_GLSL)
     add_subdirectory(MaterialXRenderGlsl)
+    target_link_libraries(MaterialXTest MaterialXRenderGlsl)
   endif()
   if(MATERIALX_BUILD_GEN_OSL)
     add_subdirectory(MaterialXRenderOsl)
+    target_link_libraries(MaterialXTest MaterialXRenderOsl)
   endif()
   if(MATERIALX_BUILD_GEN_OGSFX)
     add_subdirectory(MaterialXRenderOgsFx)
@@ -78,6 +97,8 @@ if(MATERIALX_BUILD_RENDER)
       ${OPENIMAGEIO_ROOT_DIR}/bin ${CMAKE_CURRENT_BINARY_DIR})
   endif()
 endif()
+
+# TODO: Only do this stuff when it's relevant
 
 add_custom_command(TARGET MaterialXTest POST_BUILD
 	COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -102,40 +123,6 @@ set_target_properties(
     SOVERSION "${MATERIALX_MAJOR_VERSION}"
     DEBUG_POSTFIX "${MATERIALX_DEBUG_POSTFIX}")
 
-#set(LIBS
-#    MaterialXCore
-#    MaterialXFormat
-#    MaterialXGenShader
-#    MaterialXGenOsl
-#    MaterialXGenGlsl
-#    MaterialXRender
-#    MaterialXRenderOsl
-#    MaterialXRenderHw
-#    MaterialXRenderGlsl
-#)
-#
-## Add language specific generators
-#if (MATERIALX_BUILD_GEN_ARNOLD)
-#    LIST(APPEND LIBS "MaterialXGenArnold")
-#endif()
-#if (MATERIALX_BUILD_GEN_OGSFX)
-#    LIST(APPEND LIBS "MaterialXGenOgsFx")
-#endif()
-#if (MATERIALX_BUILD_GEN_OGSXML)
-#    LIST(APPEND LIBS "MaterialXGenOgsXml")
-#endif()
-#
-## Add contrib libraries
-#if (MATERIALX_BUILD_CONTRIB)
-#    LIST(APPEND LIBS "MaterialXContrib")
-#endif()
-#
-## Add runtime library
-#if (MATERIALX_BUILD_RUNTIME)
-#    LIST(APPEND LIBS "MaterialXRuntime")
-#endif()
-
 target_link_libraries(
     MaterialXTest
-#    ${LIBS}
     ${CMAKE_DL_LIBS})

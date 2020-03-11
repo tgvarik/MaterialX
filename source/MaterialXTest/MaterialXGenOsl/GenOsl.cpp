@@ -6,10 +6,9 @@
 #include <MaterialXTest/Catch/catch.hpp>
 #include <MaterialXTest/MaterialXGenOsl/GenOsl.h>
 
-#include <MaterialXCore/TypeDesc.h>
-
 #include <MaterialXFormat/File.h>
 
+#include <MaterialXGenShader/TypeDesc.h>
 #include <MaterialXGenShader/GenContext.h>
 
 #include <MaterialXGenOsl/OslShaderGenerator.h>

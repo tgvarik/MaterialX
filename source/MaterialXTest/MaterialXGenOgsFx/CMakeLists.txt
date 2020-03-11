@@ -7,10 +7,3 @@ add_tests(${source})
 
 assign_source_group("Source Files" ${source})
 assign_source_group("Header Files" ${headers})
-
-target_link_libraries(MaterialXTest
-    MaterialXCore
-    MaterialXFormat
-    MaterialXGenShader
-    MaterialXGenGlsl
-    MaterialXGenOgsFx)

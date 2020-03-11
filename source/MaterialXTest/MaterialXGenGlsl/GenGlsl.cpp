@@ -8,9 +8,10 @@
 #include <MaterialXTest/MaterialXGenGlsl/GenGlsl.h>
 
 #include <MaterialXCore/Document.h>
-#include <MaterialXCore/TypeDesc.h>
 
 #include <MaterialXFormat/File.h>
+
+#include <MaterialXGenShader/TypeDesc.h>
 
 #include <MaterialXGenGlsl/GlslShaderGenerator.h>
 #include <MaterialXGenGlsl/GlslSyntax.h>

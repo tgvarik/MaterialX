@@ -57,6 +57,45 @@ TEST_CASE("GenShader: Valid Libraries", "[genshader]")
     REQUIRE(valid);
 }
 
+TEST_CASE("GenShader: TypeDesc Check", "[genshader]")
+{
+    // Make sure the standard types are registered
+    const mx::TypeDesc* floatType = mx::TypeDesc::get("float");
+    REQUIRE(floatType != nullptr);
+    REQUIRE(floatType->getBaseType() == mx::TypeDesc::BASETYPE_FLOAT);
+    const mx::TypeDesc* integerType = mx::TypeDesc::get("integer");
+    REQUIRE(integerType != nullptr);
+    REQUIRE(integerType->getBaseType() == mx::TypeDesc::BASETYPE_INTEGER);
+    const mx::TypeDesc* booleanType = mx::TypeDesc::get("boolean");
+    REQUIRE(booleanType != nullptr);
+    REQUIRE(booleanType->getBaseType() == mx::TypeDesc::BASETYPE_BOOLEAN);
+    const mx::TypeDesc* color2Type = mx::TypeDesc::get("color2");
+    REQUIRE(color2Type != nullptr);
+    REQUIRE(color2Type->getBaseType() == mx::TypeDesc::BASETYPE_FLOAT);
+    REQUIRE(color2Type->getSemantic() == mx::TypeDesc::SEMANTIC_COLOR);
+    REQUIRE(color2Type->isFloat2());
+    const mx::TypeDesc* color3Type = mx::TypeDesc::get("color3");
+    REQUIRE(color3Type != nullptr);
+    REQUIRE(color3Type->getBaseType() == mx::TypeDesc::BASETYPE_FLOAT);
+    REQUIRE(color3Type->getSemantic() == mx::TypeDesc::SEMANTIC_COLOR);
+    REQUIRE(color3Type->isFloat3());
+    const mx::TypeDesc* color4Type = mx::TypeDesc::get("color4");
+    REQUIRE(color4Type != nullptr);
+    REQUIRE(color4Type->getBaseType() == mx::TypeDesc::BASETYPE_FLOAT);
+    REQUIRE(color4Type->getSemantic() == mx::TypeDesc::SEMANTIC_COLOR);
+    REQUIRE(color4Type->isFloat4());
+
+    // Make sure we can register a new sutom type
+    const mx::TypeDesc* fooType = mx::TypeDesc::registerType("foo", mx::TypeDesc::BASETYPE_FLOAT, mx::TypeDesc::SEMANTIC_COLOR, 5);
+    REQUIRE(fooType != nullptr);
+
+    // Make sure we can't use a name already take
+    REQUIRE_THROWS(mx::TypeDesc::registerType("color3", mx::TypeDesc::BASETYPE_FLOAT));
+
+    // Make sure we can't request an unknown type
+    REQUIRE_THROWS(mx::TypeDesc::get("bar"));
+}
+
 TEST_CASE("GenShader: OSL Reference Implementation Check", "[genshader]")
 {
     mx::DocumentPtr doc = mx::createDocument();

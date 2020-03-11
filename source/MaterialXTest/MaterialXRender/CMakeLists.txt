@@ -7,16 +7,3 @@ add_tests(${source})
 
 assign_source_group("Source Files" ${source})
 assign_source_group("Header Files" ${headers})
-
-target_link_libraries(MaterialXTest
-    MaterialXCore
-    MaterialXFormat
-    MaterialXRender)
-
-if(MATERIALX_BUILD_CONTRIB)
-  target_link_libraries(MaterialXTest MaterialXContrib)
-endif()
-
-if (MATERIALX_BUILD_OIIO)
-  target_link_libraries(MaterialXTest ${OPENIMAGEIO_LIBRARIES})
-endif()

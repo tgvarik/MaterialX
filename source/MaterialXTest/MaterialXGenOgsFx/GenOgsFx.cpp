@@ -4,15 +4,15 @@
 //
 
 #include <MaterialXTest/Catch/catch.hpp>
+#include <MaterialXTest/MaterialXGenShader/GenShaderUtil.h>
+#include <MaterialXTest/MaterialXGenGlsl/GenGlsl.h>
 
-#include <MaterialXCore/TypeDesc.h>
 #include <MaterialXFormat/File.h>
+
+#include <MaterialXGenShader/TypeDesc.h>
 
 #include <MaterialXGenOgsFx/OgsFxShaderGenerator.h>
 #include <MaterialXGenOgsFx/OgsFxSyntax.h>
-
-#include <MaterialXTest/MaterialXGenShader/GenShaderUtil.h>
-#include <MaterialXTest/MaterialXGenGlsl/GenGlsl.h>
 
 namespace mx = MaterialX;
 

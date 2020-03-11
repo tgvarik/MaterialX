@@ -3,7 +3,7 @@
 // All rights reserved.  See LICENSE.txt for license.
 //
 
-#include <MaterialXCore/TypeDesc.h>
+#include <MaterialXGenShader/TypeDesc.h>
 
 namespace MaterialX
 {
