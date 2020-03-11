@@ -8,7 +8,7 @@
 #include <MaterialXGenShader/ShaderNode.h>
 #include <MaterialXGenShader/ShaderStage.h>
 #include <MaterialXGenShader/ShaderGenerator.h>
-#include <MaterialXGenShader/TypeDesc.h>
+#include <MaterialXCore/TypeDesc.h>
 
 namespace MaterialX
 {

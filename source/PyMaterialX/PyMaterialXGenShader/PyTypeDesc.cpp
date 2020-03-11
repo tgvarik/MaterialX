@@ -5,7 +5,7 @@
 
 #include <PyMaterialX/PyMaterialX.h>
 
-#include <MaterialXGenShader/TypeDesc.h>
+#include <MaterialXCore/TypeDesc.h>
 
 namespace py = pybind11;
 namespace mx = MaterialX;

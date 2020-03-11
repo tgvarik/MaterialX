@@ -13,8 +13,8 @@
 
 #include <MaterialXGenShader/ShaderNode.h>
 #include <MaterialXGenShader/ShaderNodeImpl.h>
-#include <MaterialXGenShader/TypeDesc.h>
-#include <MaterialXGenShader/UnitConverter.h>
+#include <MaterialXCore/TypeDesc.h>
+#include <MaterialXCore/UnitConverter.h>
 
 #include <MaterialXCore/Document.h>
 

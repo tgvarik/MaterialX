@@ -13,7 +13,7 @@
 
 #include <MaterialXGenShader/ColorManagementSystem.h>
 #include <MaterialXGenShader/ShaderNode.h>
-#include <MaterialXGenShader/TypeDesc.h>
+#include <MaterialXCore/TypeDesc.h>
 #include <MaterialXGenShader/Syntax.h>
 #include <MaterialXGenShader/UnitSystem.h>
 

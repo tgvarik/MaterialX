@@ -6,7 +6,7 @@
 #include <MaterialXGenOsl/OslSyntax.h>
 
 #include <MaterialXGenShader/Library.h>
-#include <MaterialXGenShader/TypeDesc.h>
+#include <MaterialXCore/TypeDesc.h>
 
 #include <sstream>
 

@@ -46,7 +46,7 @@ Build the Doxygen docs. Requires [Doxygen](http://www.doxygen.nl/).
 
 ### `MATERIALX_BUILD_TESTS` (default: `ON`)
 
-Build the unit tests.
+Build the unit tests. Only the unit tests for selected components will be built.
 
 ## Shader Generation Options
 
@@ -66,13 +66,25 @@ Build the OSL shader generator back-end.
 
 Build the OGSXML shader generator back-end.
 
+The following options are affected when `MATERIALX_BUILD_GEN_OGSXML=ON`:
+
+-   `MATERIALX_BUILD_GEN_GLSL`: forced to `ON`
+
 ### `MATERIALX_BUILD_GEN_OGSFX` (default: `ON`)
 
 Build the OGSFX shader generator back-end.
 
+The following options are affected when `MATERIALX_BUILD_GEN_OGSFX=ON`:
+
+-   `MATERIALX_BUILD_GEN_GLSL`: forced to `ON`
+
 ### `MATERIALX_BUILD_GEN_ARNOLD` (default: `ON`)
 
 Build the Arnold OSL shader generator back-end.
+
+The following options are affected when `MATERIALX_BUILD_GEN_ARNOLD=ON`:
+
+-   `MATERIALX_BUILD_GEN_OSL`: forced to `ON`
 
 ## Compiler Options
 

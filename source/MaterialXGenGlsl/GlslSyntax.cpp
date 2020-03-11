@@ -6,7 +6,7 @@
 #include <MaterialXGenGlsl/GlslSyntax.h>
 
 #include <MaterialXGenShader/Library.h>
-#include <MaterialXGenShader/TypeDesc.h>
+#include <MaterialXCore/TypeDesc.h>
 
 namespace MaterialX
 {

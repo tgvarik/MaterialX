@@ -20,7 +20,7 @@
 
 #include <MaterialXCore/Types.h>
 
-#include <MaterialXGenShader/Util.h>
+#include <MaterialXFormat/Util.h>
 #include <sstream>
 
 namespace MaterialX
