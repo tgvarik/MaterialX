@@ -162,21 +162,21 @@ TEST_CASE("UnitDocument", "[units]")
                                 float reconvert = uconverter->convert(convertedValue, DISTANCE_DEFAULT, input->getUnit());
                                 REQUIRE((originalval - reconvert) < EPSILON);
                             }
-                            else if (type == "vector2" || type == "color2")
+                            else if (type == "vector2")
                             {
                                 mx::Vector2 originalval = value->asA<mx::Vector2>();
                                 mx::Vector2 convertedValue = uconverter->convert(originalval, input->getUnit(), DISTANCE_DEFAULT);
                                 mx::Vector2 reconvert = uconverter->convert(convertedValue, DISTANCE_DEFAULT, input->getUnit());
                                 REQUIRE(originalval == reconvert);
                             }
-                            else if (type == "vector3" || type == "color3")
+                            else if (type == "vector3")
                             {
                                 mx::Vector3 originalval = value->asA<mx::Vector3>();
                                 mx::Vector3 convertedValue = uconverter->convert(originalval, input->getUnit(), DISTANCE_DEFAULT);
                                 mx::Vector3 reconvert = uconverter->convert(convertedValue, DISTANCE_DEFAULT, input->getUnit());
                                 REQUIRE(originalval == reconvert);
                             }
-                            else if (type == "vector4" || type == "color4")
+                            else if (type == "vector4")
                             {
                                 mx::Vector4 originalval = value->asA<mx::Vector4>();
                                 mx::Vector4 convertedValue = uconverter->convert(originalval, input->getUnit(), DISTANCE_DEFAULT);
@@ -200,21 +200,21 @@ TEST_CASE("UnitDocument", "[units]")
                                 float reconvert = uconverter->convert(convertedValue, DISTANCE_DEFAULT, param->getUnit());
                                 REQUIRE((originalval - reconvert) < EPSILON);
                             }
-                            else if (type == "vector2" || type == "color2")
+                            else if (type == "vector2")
                             {
                                 mx::Vector2 originalval = value->asA<mx::Vector2>();
                                 mx::Vector2 convertedValue = uconverter->convert(originalval, param->getUnit(), DISTANCE_DEFAULT);
                                 mx::Vector2 reconvert = uconverter->convert(convertedValue, DISTANCE_DEFAULT, param->getUnit());
                                 REQUIRE(originalval == reconvert);
                             }
-                            else if (type == "vector3" || type == "color3")
+                            else if (type == "vector3")
                             {
                                 mx::Vector3 originalval = value->asA<mx::Vector3>();
                                 mx::Vector3 convertedValue = uconverter->convert(originalval, param->getUnit(), DISTANCE_DEFAULT);
                                 mx::Vector3 reconvert = uconverter->convert(convertedValue, DISTANCE_DEFAULT, param->getUnit());
                                 REQUIRE(originalval == reconvert);
                             }
-                            else if (type == "vector4" || type == "color4")
+                            else if (type == "vector4")
                             {
                                 mx::Vector4 originalval = value->asA<mx::Vector4>();
                                 mx::Vector4 convertedValue = uconverter->convert(originalval, param->getUnit(), DISTANCE_DEFAULT);
