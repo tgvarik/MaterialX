@@ -26,7 +26,7 @@ The [resources](resources) folder will be copied to the install location only if
 
 The following additional options are only relevant when `MATERIALX_BUILD_RENDER=ON`:
 
--   `MATERIALX_TEST_RENDER` (default: `OFF`): Run rendering tests. GPU required.
+-   `MATERIALX_TEST_RENDER` (default: `ON`): Run rendering tests. GPU required.
 -   `MATERIALX_BUILD_VIEWER` (default: `ON`): Build the MaterialX Viewer. Requires the NanoGUI submodule to be present. Run `git submodule update --init --recursive` from the repository root to load it.
 -   `MATERIALX_BUILD_CONTRIB` (default: `ON`): Build the [contributions folder](source/MaterialXContrib).
 -   `MATERIALX_BUILD_OIIO` (default: `OFF`): Build OpenImageIO support for MaterialXRender. Requires [OpenImageIO](http://www.openimageio.org/).
