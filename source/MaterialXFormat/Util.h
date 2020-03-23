@@ -46,9 +46,6 @@ StringVec loadLibraries(const StringVec& libraryNames,
                         DocumentPtr doc,
                         const StringSet* excludeFiles = nullptr);
 
-
-
-
 } // namespace MaterialX
 
 #endif //MATERIALX_FORMAT_UTIL_H
