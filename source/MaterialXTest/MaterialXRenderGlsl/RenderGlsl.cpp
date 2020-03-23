@@ -95,6 +95,8 @@ void GlslShaderRenderTester::registerLights(mx::DocumentPtr document,
     // Load environment lights.
     mx::ImagePtr envRadiance = _renderer->getImageHandler()->acquireImage(options.radianceIBLPath, true);
     mx::ImagePtr envIrradiance = _renderer->getImageHandler()->acquireImage(options.irradianceIBLPath, true);
+    REQUIRE(envRadiance);
+    REQUIRE(envIrradiance);
     _lightHandler->setEnvRadianceMap(envRadiance);
     _lightHandler->setEnvIrradianceMap(envIrradiance);
 }
@@ -474,6 +476,7 @@ bool GlslShaderRenderTester::runRenderer(const std::string& shaderName,
                     {
                         RenderUtil::AdditiveScopedTimer renderTimer(profileTimes.languageTimes.renderTime, "GLSL render time");
                         _renderer->getImageHandler()->setSearchPath(imageSearchPath);
+                        _renderer->setSize(static_cast<unsigned int>(testOptions.renderSize[0]), static_cast<unsigned int>(testOptions.renderSize[1]));
                         _renderer->render();
                     }
 

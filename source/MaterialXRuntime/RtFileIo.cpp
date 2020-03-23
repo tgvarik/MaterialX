@@ -30,7 +30,7 @@ namespace
 {
     // Lists of known metadata which are handled explicitly by import/export.
     static const RtTokenSet nodedefMetadata     = { RtToken("name"), RtToken("type"), RtToken("node") };
-    static const RtTokenSet attrMetadata        = { RtToken("name"), RtToken("type"), RtToken("value"), RtToken("nodename"), RtToken("output"), RtToken("colorspace"), RtToken("unit") };
+    static const RtTokenSet attrMetadata        = { RtToken("name"), RtToken("type"), RtToken("value"), RtToken("nodename"), RtToken("output"), RtToken("colorspace"), RtToken("unit"), RtToken("unittype") };
     static const RtTokenSet nodeMetadata        = { RtToken("name"), RtToken("type"), RtToken("node") };
     static const RtTokenSet nodegraphMetadata   = { RtToken("name") };
     static const RtTokenSet genericMetadata     = { RtToken("name"), RtToken("kind") };
@@ -127,12 +127,21 @@ namespace
             {
                 RtValue::fromString(attrType, valueStr, attr.getValue());
             }
-            if (elem->hasColorSpace())
+            const string& colorSpace = elem->getColorSpace();
+            if (!colorSpace.empty())
             {
                 attr.setColorSpace(RtToken(elem->getColorSpace()));
             }
-            // TODO: fix when units are implemented in core
-            // input->setUnit(RtToken(elem->getUnit()));
+            const string& unitStr = elem->getUnit();
+            if (!unitStr.empty())
+            {
+                attr.setUnit(RtToken(unitStr));
+            }
+            const string& unitTypeStr = elem->getUnitType();
+            if (!unitTypeStr.empty())
+            {
+                attr.setUnitType(RtToken(unitTypeStr));
+            }
 
             readMetadata(elem, PvtObject::ptr<PvtObject>(attr), attrMetadata);
         }
@@ -270,6 +279,21 @@ namespace
             {
                 const RtToken portType(elem->getType());
                 RtValue::fromString(portType, valueStr, input->getValue());
+            }
+            const string& colorSpace = elem->getColorSpace();
+            if (!colorSpace.empty())
+            {
+                input->setColorSpace(RtToken(elem->getColorSpace()));
+            }
+            const string& unitStr = elem->getUnit();
+            if (!unitStr.empty())
+            {
+                input->setUnit(RtToken(unitStr));
+            }
+            const string& unitTypeStr = elem->getUnitType();
+            if (!unitTypeStr.empty())
+            {
+                input->setUnitType(RtToken(unitTypeStr));
             }
         }
 
@@ -553,6 +577,22 @@ namespace
         makeLookInheritConnections(doc->getLooks(), rootPrim);
     }
 
+    void validateNodesHaveNodedefs(DocumentPtr doc)
+    {
+        for (const ElementPtr& elem : doc->getChildren())
+        {
+            if (elem->isA<Node>())
+            {
+                NodePtr node = elem->asA<Node>();
+                const RtToken nodedefName = resolveNodeDefName(node);
+                if (nodedefName == EMPTY_TOKEN)
+                {
+                    throw ExceptionRuntimeError("No matching nodedef was found for node '" + node->getName() + "'");
+                }
+            }
+        }
+    }
+
     void readDocument(const DocumentPtr& doc, PvtStage* stage, const RtReadOptions* readOptions)
     {
         const string ROOT_PATH(PvtPath::ROOT_NAME);
@@ -578,6 +618,8 @@ namespace
                 }
             }
         }
+
+        validateNodesHaveNodedefs(doc);
 
         // Load all other elements.
         for (const ElementPtr& elem : doc->getChildren())
@@ -657,11 +699,14 @@ namespace
             {
                 destPort->setColorSpace(attr->getColorSpace().str());
             }
-            // TODO: fix when units are implemented in core.
-            //if (attr->getUnit())
-            //{
-            //    destInput->setUnit(input->getUnit().str());
-            //}
+            if (attr->getUnit())
+            {
+                destPort->setUnit(attr->getUnit().str());
+            }
+            if (attr->getUnitType())
+            {
+                destPort->setUnitType(attr->getUnitType().str());
+            }
 
             writeMetadata(attr, destPort, attrMetadata);
         }
@@ -730,8 +775,29 @@ namespace
                             {
                                 RtPrim sourceNode = source.getParent();
                                 InputPtr inputElem = valueElem->asA<Input>();
-                                inputElem->setNodeName(sourceNode.getName());
-                                inputElem->setOutputString(source.getName());
+                                if (sourceNode.hasApi<RtNodeGraph>())
+                                {
+                                    inputElem->setNodeGraphName(
+                                        sourceNode.getName());
+                                    inputElem->setOutputString(
+                                        source.getName());
+                                }
+                                else
+                                {
+                                    inputElem->setNodeName(sourceNode.getName());
+                                    RtNode rtSourceNode(sourceNode);
+                                    int numSourceNodeOutputs = 0;
+                                    auto outputIter = rtSourceNode.getOutputs();
+                                    while (!outputIter.isDone())
+                                    {
+                                        numSourceNodeOutputs++;
+                                        ++outputIter;
+                                    }
+                                    if (numSourceNodeOutputs > 1)
+                                    {
+                                        inputElem->setOutputString(source.getName());
+                                    }
+                                }
                             }
                         }
                         else
@@ -745,11 +811,16 @@ namespace
                     {
                         valueElem->setColorSpace(colorspace.str());
                     }
-                    //if (input.getUnit())
-                    //{
-                    //    TODO: fix when units are implemented in core.
-                    //    valueElem->setUnit(input->getUnit().str());
-                    //}
+                    const RtToken unit = input.getUnit();
+                    if (unit != EMPTY_TOKEN)
+                    {
+                        valueElem->setUnit(unit.str());
+                    }
+                    const RtToken unitType = input.getUnitType();
+                    if (unitType != EMPTY_TOKEN)
+                    {
+                        valueElem->setUnitType(unitType.str());
+                    }
                 }
                 else if(numOutputs > 1)
                 {
@@ -780,25 +851,25 @@ namespace
             for (InputPtr input : surfaceShader->getActiveInputs())
             {
                 BindInputPtr bindInput = shaderRef->addBindInput(input->getName(), input->getType());
-                if (input->hasNodeName() && input->hasOutputString())
+                if (input->hasNodeGraphName() && input->hasOutputString() && doc->getNodeGraph(input->getNodeGraphName()))
                 {
-                    if (doc->getNodeGraph(input->getNodeName()))
-                    {
-                        bindInput->setNodeGraphString(input->getNodeName());
-                        bindInput->setOutputString(input->getOutputString());
-                    }
-                    else
-                    {
-                        const auto outputName = std::string(OUTPUT_ELEMENT_PREFIX.c_str()) +
-                                                input->getNodeName() + "_" + 
-                                                input->getOutputString();
-                        if (!doc->getOutput(outputName)) {
-                            auto output = doc->addOutput(outputName, input->getType());
-                            output->setNodeName(input->getNodeName());
+                    bindInput->setNodeGraphString(input->getNodeGraphName());
+                    bindInput->setOutputString(input->getOutputString());
+                }
+                else if(input->hasNodeName())
+                {
+                    const auto outputName = std::string(OUTPUT_ELEMENT_PREFIX.c_str()) +
+                                            input->getNodeName() + "_out";
+                    if (!doc->getOutput(outputName)) {
+                        auto output = doc->addOutput(outputName, input->getType());
+                        output->setNodeName(input->getNodeName());
+                        auto srcNode = input->getConnectedNode();
+                        if (srcNode->getOutputs().size() > 1)
+                        {
                             output->setOutputString(input->getOutputString());
                         }
-                        bindInput->setOutputString(outputName);
                     }
+                    bindInput->setOutputString(outputName);
                 }
                 else
                 {
@@ -856,7 +927,18 @@ namespace
                 {
                     RtPrim sourceNode = source.getParent();
                     output->setNodeName(sourceNode.getName());
-                    output->setOutputString(source.getName());
+                    RtNode rtSourceNode(sourceNode);
+                    int numSourceNodeOutputs = 0;
+                    auto outputIter = rtSourceNode.getOutputs();
+                    while (!outputIter.isDone())
+                    {
+                        numSourceNodeOutputs++;
+                        ++outputIter;
+                    }
+                    if (numSourceNodeOutputs > 1)
+                    {
+                        output->setOutputString(source.getName());
+                    }
                 }
             }
         }
@@ -906,7 +988,10 @@ namespace
                 LookPtr look = dest.addLook(name);
 
                 // Add inherit
-                look->setInheritString(rtLook.getInherit().getTargetsAsString());
+                if (!rtLook.getInherit().getTargetsAsString().empty())
+                {
+                    look->setInheritString(rtLook.getInherit().getTargetsAsString());
+                }
 
                 // Add in material assignments
                 for (const RtObject& obj : rtLook.getMaterialAssigns().getTargets())
@@ -925,10 +1010,14 @@ namespace
                     {
                         massign->setExclusive(rtMatAssign.getExclusive().getValue().asBool());
                         auto iter = rtMatAssign.getCollection().getTargets();
-                        massign->setCollectionString((*iter).getName());
+                        if (!iter.isDone()) {
+                            massign->setCollectionString((*iter).getName());
+                        }
 
                         iter = rtMatAssign.getMaterial().getTargets();
-                        massign->setMaterial((*iter).getName());
+                        if (!iter.isDone()) {
+                            massign->setMaterial((*iter).getName());
+                        }
                         massign->setGeom(rtMatAssign.getGeom().getValueString());
                     }
                 }
@@ -1051,6 +1140,27 @@ namespace
         }
     }
 
+    void readUnitDefinitions(DocumentPtr doc)
+    {
+        RtApi& api = RtApi::get();
+        UnitConverterRegistryPtr unitDefinitions = api.getUnitDefinitions();
+        for (UnitTypeDefPtr unitTypeDef : doc->getUnitTypeDefs())
+        {
+            LinearUnitConverterPtr unitConvert = LinearUnitConverter::create(unitTypeDef);
+            unitDefinitions->addUnitConverter(unitTypeDef, unitConvert);
+        }
+    }
+
+    void writeUnitDefinitions(DocumentPtr doc)
+    {
+        RtApi& api = RtApi::get();
+        UnitConverterRegistryPtr unitDefinitions = api.getUnitDefinitions();
+        if (unitDefinitions)
+        {
+            unitDefinitions->write(doc);
+        }
+    }
+
 } // end anonymous namespace
 
 RtReadOptions::RtReadOptions() :
@@ -1086,14 +1196,26 @@ void RtFileIo::read(const FilePath& documentPath, const FileSearchPath& searchPa
         }
         readFromXmlFile(document, documentPath, searchPaths, &xmlReadOptions);
 
-        PvtStage* stage = PvtStage::ptr(_stage);
-        readDocument(document, stage, readOptions);
+        string errorMessage;
+        DocumentPtr validationDocument = createDocument();
+        writeUnitDefinitions(validationDocument);
+        validationDocument->copyContentFrom(document);
+        if (validationDocument->validate(&errorMessage))
+        {
+            PvtStage* stage = PvtStage::ptr(_stage);
+            readDocument(document, stage, readOptions);
+        }
+        else
+        {
+            throw ExceptionRuntimeError("Failed validation: " + errorMessage);
+        }
     }
     catch (Exception& e)
     {
         throw ExceptionRuntimeError("Could not read file: " + documentPath.asString() + ". Error: " + e.what());
     }
 }
+
 void RtFileIo::read(std::istream& stream, const RtReadOptions* readOptions)
 {
     try
@@ -1109,8 +1231,20 @@ void RtFileIo::read(std::istream& stream, const RtReadOptions* readOptions)
         }
         readFromXmlStream(document, stream, &xmlReadOptions);
 
-        PvtStage* stage = PvtStage::ptr(_stage);
-        readDocument(document, stage, readOptions);
+        string errorMessage; 
+        DocumentPtr validationDocument = createDocument();
+        writeUnitDefinitions(validationDocument);
+        validationDocument->copyContentFrom(document);
+        if (validationDocument->validate(&errorMessage))
+        {
+            PvtStage* stage = PvtStage::ptr(_stage);
+            readDocument(document, stage, readOptions);
+        }
+        else
+        {
+            throw ExceptionRuntimeError("Failed validation: " + errorMessage);
+        }
+
     }
     catch (Exception& e)
     {
@@ -1132,6 +1266,9 @@ void RtFileIo::readLibraries(const StringVec& libraryPaths, const FileSearchPath
         stage->addSourceUri(RtToken(uri));
     }
 
+    // Update any units found
+    readUnitDefinitions(doc);
+
     // First, load all nodedefs. Having these available is needed
     // when node instances are loaded later.
     for (const NodeDefPtr& nodedef : doc->getNodeDefs())
@@ -1142,6 +1279,8 @@ void RtFileIo::readLibraries(const StringVec& libraryPaths, const FileSearchPath
             RtNodeDef(prim->hnd()).registerMasterPrim();
         }
     }
+
+    validateNodesHaveNodedefs(doc);
 
     // Second, load all other elements.
     for (const ElementPtr& elem : doc->getChildren())
@@ -1182,6 +1321,10 @@ void RtFileIo::write(const FilePath& documentPath, const RtWriteOptions* options
         xmlWriteOptions.writeXIncludeEnable = options->writeIncludes;
         document->setVersionString(makeVersionString(options->desiredMajorVersion, options->desiredMinorVersion));
     }
+    else
+    {
+        document->setVersionString(makeVersionString(MATERIALX_MAJOR_VERSION, MATERIALX_MINOR_VERSION + 1));
+    }
     writeToXmlFile(document, documentPath, &xmlWriteOptions);
 }
 
@@ -1197,6 +1340,10 @@ void RtFileIo::write(std::ostream& stream, const RtWriteOptions* options)
     {
         xmlWriteOptions.writeXIncludeEnable = options->writeIncludes;
         document->setVersionString(makeVersionString(options->desiredMajorVersion, options->desiredMinorVersion));
+    }
+    else
+    {
+        document->setVersionString(makeVersionString(MATERIALX_MAJOR_VERSION, MATERIALX_MINOR_VERSION + 1));
     }
     writeToXmlStream(document, stream, &xmlWriteOptions);
 }
