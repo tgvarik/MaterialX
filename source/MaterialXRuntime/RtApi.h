@@ -15,7 +15,7 @@
 
 #include <MaterialXFormat/File.h>
 
-#include <MaterialXGenShader/UnitConverter.h>
+#include <MaterialXCore/UnitConverter.h>
 
 namespace MaterialX
 {
