@@ -3,7 +3,7 @@
 // All rights reserved.  See LICENSE.txt for license.
 //
 
-#include <MaterialXCore/UnitConverter.h>
+#include <MaterialXCore/Unit.h>
 
 #include <MaterialXCore/Util.h>
 

@@ -6,7 +6,7 @@
 #include <MaterialXTest/Catch/catch.hpp>
 #include <MaterialXTest/MaterialXRender/RenderUtil.h>
 
-#include <MaterialXCore/UnitConverter.h>
+#include <MaterialXCore/Unit.h>
 
 #include <MaterialXFormat/Util.h>
 

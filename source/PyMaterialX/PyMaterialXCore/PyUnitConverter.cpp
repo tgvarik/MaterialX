@@ -5,7 +5,7 @@
 
 #include <PyMaterialX/PyMaterialX.h>
 
-#include <MaterialXCore/UnitConverter.h>
+#include <MaterialXCore/Unit.h>
 
 namespace py = pybind11;
 namespace mx = MaterialX;
